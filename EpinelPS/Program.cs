@@ -5,6 +5,7 @@ using EpinelPS.LobbyServer;
 using EpinelPS.Networking;
 using EpinelPS.Services;
 using EpinelPS.Utils;
+using EpinelPS.LobbyServer.Stage;
 using log4net.Config;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
@@ -48,6 +49,17 @@ internal class Program
 
             await GameData.CreateAsync();
 
+
+
+            foreach (var user in JsonDb.Instance.Users)
+            {
+                if (user.LastNormalStageCleared >= 6000002)
+                {
+                    ClearStage.EnsureDefaultCharacters(user);
+                }
+                ClearStage.ReconcileMainQuests(user);
+            }
+
             Console.WriteLine("Initializing database");
             JsonDb.Save();
 
@@ -86,6 +98,7 @@ internal class Program
             // Add services to the container.
             string connectionString = builder.Configuration.GetConnectionString("EpinelPSConnection").Replace("(startupDirectory)", AppDomain.CurrentDomain.BaseDirectory);
             string connectionType = builder.Configuration.GetConnectionString("EpinelPSConnectionType").ToLower();
+            GameContext.InitializeOptions(connectionString, connectionType);
             builder.Services.AddHttpContextAccessor();
             builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddSingleton<MessengerAdminService>();
