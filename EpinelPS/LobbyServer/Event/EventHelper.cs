@@ -138,8 +138,8 @@ public class EventHelper
     private static bool IsValidDatedEventTable(string? table)
     {
         if (string.IsNullOrEmpty(table)) return false;
-        // Exclude event_old (shared historical bucket) and event_260319 (missing sprite table on client)
-        if (table == "event_old" || table == "event_260319") return false;
+        // Exclude event_old (shared historical bucket for legacy events)
+        if (table == "event_old") return false;
         return System.Text.RegularExpressions.Regex.IsMatch(table, @"^event_\d{6}$");
     }
 
@@ -272,18 +272,6 @@ public class EventHelper
                 if (eventData.EventDisableDate == 0) eventData.EventDisableDate = DateTime.UtcNow.AddDays(30).Ticks;
                 if (eventData.EventEndDate == 0) eventData.EventEndDate = DateTime.UtcNow.AddDays(30).Ticks;
 
-                if (GameData.Instance.eventManagers.TryGetValue(eventData.Id, out var em))
-                {
-                    // If the event specifies a localized sprite table that does not exist on the client (e.g. event_260319),
-                    // hide it from the lobby carousel by setting Visible/Disable dates to the past (Ticks = 1).
-                    // Its EventStartDate and EventEndDate remain active so the event itself is fully playable via private banner!
-                    if (em.EventBannerResourceTable == "event_260319")
-                    {
-                        eventData.EventVisibleDate = 1;
-                        eventData.EventDisableDate = 1;
-                    }
-                }
-
                 if (eventData.Id != 10046) // todo fix properly
                     response.EventList.Add(eventData);
             }
@@ -306,16 +294,6 @@ public class EventHelper
                 if (eventData.EventVisibleDate == 0) eventData.EventVisibleDate = DateTime.UtcNow.AddDays(-21).Ticks;
                 if (eventData.EventDisableDate == 0) eventData.EventDisableDate = DateTime.UtcNow.AddDays(30).Ticks;
                 if (eventData.EventEndDate == 0) eventData.EventEndDate = DateTime.UtcNow.AddDays(30).Ticks;
-
-                if (GameData.Instance.eventManagers.TryGetValue(eventData.Id, out var em))
-                {
-                    if (em.EventBannerResourceTable == "event_260319")
-                    {
-                        eventData.EventVisibleDate = 1;
-                        eventData.EventDisableDate = 1;
-                    }
-                }
-
                 response.EventWithJoinData.Add(new NetEventWithJoinData()
                 {
                     EventData = eventData,
