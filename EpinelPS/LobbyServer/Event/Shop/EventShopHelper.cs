@@ -153,12 +153,19 @@ public static class EventShopHelper
             CurrencyType currencyType = (CurrencyType)key;
             user.SubtractCurrency(currencyType, totalCurrencyPrice[key]);
             response.Currencies.Add(new NetUserCurrencyData() { Type = key, Value = user.GetCurrencyVal(currencyType) });
+            if (currencyType == CurrencyType.FreeCash)
+            {
+                response.Currencies.Add(new NetUserCurrencyData() { Type = (int)CurrencyType.ChargeCash, Value = user.GetCurrencyVal(CurrencyType.ChargeCash) });
+            }
         }
         foreach (int tid in totalItemPrice.Keys)
         {
             var item = user.Items.FirstOrDefault(i => i.ItemType == tid);
-            user.RemoveItemBySerialNumber(item.Isn, totalItemPrice[tid]);
-            response.Items.Add(new NetUserItemData() { Tid = tid, Count = user.Items.FirstOrDefault(i => i.ItemType == tid).Count, Isn = item.Isn });
+            if (item != null)
+            {
+                user.RemoveItemBySerialNumber(item.Isn, totalItemPrice[tid]);
+                response.Items.Add(new NetUserItemData() { Tid = tid, Count = user.Items.FirstOrDefault(i => i.ItemType == tid)?.Count ?? 0, Isn = item.Isn });
+            }
         }
     }
 
@@ -184,9 +191,11 @@ public static class EventShopHelper
         Logging.WriteLine($"totalCurrencyPrice: {JsonConvert.SerializeObject(totalCurrencyPrices)}", LogType.Debug);
         foreach (int currencyType in totalCurrencyPrices.Keys)
         {
-            var userCurrency = user.Currency.FirstOrDefault(x => x.Key == (CurrencyType)currencyType).Value;
-            if (userCurrency < totalCurrencyPrices[currencyType])
+            if (!user.CanSubtractCurrency((CurrencyType)currencyType, totalCurrencyPrices[currencyType]))
             {
+                long userCurrency = (CurrencyType)currencyType == CurrencyType.FreeCash
+                    ? user.GetCurrencyVal(CurrencyType.FreeCash) + user.GetCurrencyVal(CurrencyType.ChargeCash)
+                    : user.GetCurrencyVal((CurrencyType)currencyType);
                 Logging.WriteLine($"Insufficient funds: Have {userCurrency}, need {totalCurrencyPrices[currencyType]}");
                 return false;
             }
@@ -322,26 +331,31 @@ public static class EventShopHelper
 
     public static bool UpdateCurrency(User user, int priceId, int priceValue, int quantity, ref ResEventShopBuyProduct response)
     {
-        long totalPrice = priceValue * quantity;
-        if (!user.Currency.TryGetValue((CurrencyType)priceId, out var currentAmount))
+        long totalPrice = (long)priceValue * quantity;
+        CurrencyType currencyType = (CurrencyType)priceId;
+        if (!user.CanSubtractCurrency(currencyType, totalPrice))
         {
+            long currentAmount = currencyType == CurrencyType.FreeCash
+                ? user.GetCurrencyVal(CurrencyType.FreeCash) + user.GetCurrencyVal(CurrencyType.ChargeCash)
+                : user.GetCurrencyVal(currencyType);
             Logging.WriteLine($"Insufficient funds: Have {currentAmount}, need {totalPrice}");
             return false;
         }
 
-        if (currentAmount < totalPrice)
-        {
-            Logging.WriteLine($"Insufficient funds: Have {currentAmount}, need {totalPrice}");
-            return false;
-        }
-        CurrencyType currencyType = (CurrencyType)priceId; // Assuming PriceId maps directly to CurrencyType
-        long newAmount = currentAmount - totalPrice; // calculate new amount
-        user.Currency[currencyType] = newAmount; // update user currency
-        response.Currencies.Add(new NetUserCurrencyData // Update response currency
+        user.SubtractCurrency(currencyType, totalPrice);
+        response.Currencies.Add(new NetUserCurrencyData
         {
             Type = (int)currencyType,
-            Value = newAmount
+            Value = user.GetCurrencyVal(currencyType)
         });
+        if (currencyType == CurrencyType.FreeCash)
+        {
+            response.Currencies.Add(new NetUserCurrencyData
+            {
+                Type = (int)CurrencyType.ChargeCash,
+                Value = user.GetCurrencyVal(CurrencyType.ChargeCash)
+            });
+        }
         return true;
     }
 

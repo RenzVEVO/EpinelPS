@@ -337,52 +337,49 @@ public class User
     }
     public bool SubtractCurrency(CurrencyType type, long val)
     {
+        if (val <= 0) return true;
+
         if (type == CurrencyType.FreeCash)
         {
-            if (Currency.ContainsKey(type))
-            {
-                if (Currency[type] < val)
-                {
-                    long diff = val - Currency[type];
-                    if (Currency.ContainsKey(CurrencyType.ChargeCash))
-                    {
-                        if (Currency[CurrencyType.ChargeCash] > diff)
-                        {
-                            Currency[type] = 0;
-                            Currency[CurrencyType.ChargeCash] -= diff;
-                            return true;
-                        }
-                        else
-                        {
-                            return false;
-                        }
-                    }
-                }
-            }
-        }
-        if (Currency.ContainsKey(type)) Currency[type] -= val;
-        else return false;
+            long free = Currency.TryGetValue(CurrencyType.FreeCash, out long f) ? f : 0;
+            long paid = Currency.TryGetValue(CurrencyType.ChargeCash, out long p) ? p : 0;
+            if (free + paid < val) return false;
 
-        if (Currency[type] < 0)
-        {
-            Currency[type] += val;
-            return false;
+            long deductFree = Math.Min(free, val);
+            long deductPaid = val - deductFree;
+
+            Currency[CurrencyType.FreeCash] = free - deductFree;
+            if (deductPaid > 0)
+            {
+                Currency[CurrencyType.ChargeCash] = paid - deductPaid;
+            }
+            return true;
         }
-        return true;
+
+        if (Currency.TryGetValue(type, out long current))
+        {
+            if (current < val) return false;
+            Currency[type] = current - val;
+            return true;
+        }
+
+        return false;
     }
+
     public bool CanSubtractCurrency(CurrencyType type, long val)
     {
-        if (Currency.ContainsKey(type))
+        if (val <= 0) return true;
+
+        if (type == CurrencyType.FreeCash)
         {
-            if (Currency[type] >= val) return true;
-            else return false;
+            long free = Currency.TryGetValue(CurrencyType.FreeCash, out long f) ? f : 0;
+            long paid = Currency.TryGetValue(CurrencyType.ChargeCash, out long p) ? p : 0;
+            return (free + paid) >= val;
         }
-        else
-        {
-            if (val == 0) return true;
-            else return false;
-        }
+
+        return Currency.TryGetValue(type, out long current) && current >= val;
     }
+
 
     public bool HasCharacter(int c)
     {
