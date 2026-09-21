@@ -11,5 +11,7 @@
   "GameMaxVer": "160.0.2",
   "EnablePurchaseSimulation": true,
   "ArchiveUnlockAll": false,
-  "TargetVersion": "152.8.11"
+  "TargetVersion": "152.8.11",
+  "SoloRaidMode": "AutoCycle",
+  "SoloRaidFixedId": 0
 }

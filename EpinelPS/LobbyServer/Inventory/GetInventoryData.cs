@@ -1,4 +1,4 @@
-﻿using EpinelPS.Data;
+using EpinelPS.Data;
 namespace EpinelPS.LobbyServer.Inventory;
 
 [GameRequest("/inventory/get")]
@@ -30,8 +30,8 @@ public class GetInventoryData : LobbyMessage
         }
 
 
-        // Add all equipment awakenings
-        foreach (EquipmentAwakeningData awakening in user.EquipmentAwakenings)
+        // Add all equipment awakenings (ignore unconfirmed pending roll duplicates)
+        foreach (EquipmentAwakeningData awakening in user.EquipmentAwakenings.Where(x => !x.IsNewData))
         {
             response.Awakenings.Add(new NetEquipmentAwakening()
             {
