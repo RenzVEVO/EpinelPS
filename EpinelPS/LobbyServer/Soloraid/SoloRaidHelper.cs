@@ -526,7 +526,7 @@ public class SoloRaidHelper
     /// <returns></returns>
     public static NetSoloRaidPeriodData GetSoloRaidPeriod()
     {
-        string mode = GameConfig.Root.SoloRaidMode ?? "AutoCycle";
+        string mode = GameConfig.Root.SoloRaidMode ?? "Latest";
         DateTime utcNow = DateTime.UtcNow;
 
         if (mode.Equals("AutoCycle", StringComparison.OrdinalIgnoreCase))
@@ -577,7 +577,7 @@ public class SoloRaidHelper
         var validRaids = GetValidRaidIds();
         if (validRaids.Count == 0) return 0;
 
-        string mode = GameConfig.Root.SoloRaidMode ?? "AutoCycle";
+        string mode = GameConfig.Root.SoloRaidMode ?? "Latest";
 
         if (mode.Equals("Fixed", StringComparison.OrdinalIgnoreCase))
         {

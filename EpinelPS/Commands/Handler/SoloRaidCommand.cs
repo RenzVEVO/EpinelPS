@@ -32,7 +32,7 @@ public class SoloRaidHandler(IExecutionContext context) : BaseHandler<SoloRaidPa
         {
             int currentId = SoloRaidHelper.GetRaidId();
             string bossName = SoloRaidHelper.GetBossName(currentId);
-            string mode = GameConfig.Root.SoloRaidMode ?? "AutoCycle";
+            string mode = GameConfig.Root.SoloRaidMode ?? "Latest";
 
             var sb = new StringBuilder();
             sb.AppendLine("=== Solo Raid Status ===");

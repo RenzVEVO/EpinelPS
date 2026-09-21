@@ -25,9 +25,9 @@ public class GameConfigRoot
     /// </summary>
     public string TargetVersion { get; set; } = "";
     /// <summary>
-    /// Solo Raid boss selection mode: "AutoCycle" (default: rotates weekly across all available bosses), "Latest" (newest boss in static data), or "Fixed" (specified by SoloRaidFixedId).
+    /// Solo Raid boss selection mode: "Latest" (default: newest boss in static data matching current game update), "AutoCycle" (rotates weekly across all available bosses), or "Fixed" (specified by SoloRaidFixedId).
     /// </summary>
-    public string SoloRaidMode { get; set; } = "AutoCycle";
+    public string SoloRaidMode { get; set; } = "Latest";
     /// <summary>
     /// Fixed Solo Raid ID when SoloRaidMode is "Fixed".
     /// </summary>
