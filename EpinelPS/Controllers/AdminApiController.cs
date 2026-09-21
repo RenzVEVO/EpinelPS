@@ -1,6 +1,7 @@
 using EpinelPS.Controllers.AdminPanel;
 using EpinelPS.Data;
 using EpinelPS.Database;
+using EpinelPS.LobbyServer.Soloraid;
 using EpinelPS.LobbyServer.SoloraidMuseum;
 using EpinelPS.Models.Admin;
 using EpinelPS.Utils;
@@ -277,6 +278,85 @@ public class AdminApiController(GameContext DbContext) : ControllerBase
         JsonDb.Save();
         Logging.WriteLine($"[Admin] solo raid museum season reset user={request.UserId}, stage={request.StageId}", LogType.Info);
         return RunCmdResponse.OK;
+    }
+
+    [HttpGet("soloRaid")]
+    public IActionResult GetSoloRaid()
+    {
+        if (!AdminController.CheckAuth(HttpContext)) return Unauthorized();
+
+        var validRaids = SoloRaidHelper.GetValidRaidIds();
+        int activeId = SoloRaidHelper.GetRaidId();
+        string mode = GameConfig.Root.SoloRaidMode ?? "Latest";
+        int fixedId = GameConfig.Root.SoloRaidFixedId;
+
+        var bosses = validRaids.Select(id => new
+        {
+            id,
+            name = SoloRaidHelper.GetBossName(id),
+            isActive = (id == activeId)
+        }).ToList();
+
+        return Ok(new
+        {
+            mode,
+            activeId,
+            activeName = SoloRaidHelper.GetBossName(activeId),
+            fixedId,
+            totalRaids = validRaids.Count,
+            bosses
+        });
+    }
+
+    [HttpPost("soloRaid")]
+    public IActionResult SaveSoloRaid([FromBody] SoloRaidSaveRequest req)
+    {
+        if (!AdminController.CheckAuth(HttpContext)) return Unauthorized();
+
+        var validRaids = SoloRaidHelper.GetValidRaidIds();
+        if (validRaids.Count == 0)
+            return BadRequest(new { error = "No valid Solo Raids found in game data." });
+
+        string mode = (req.Mode ?? "Latest").Trim();
+        if (!mode.Equals("Latest", StringComparison.OrdinalIgnoreCase) &&
+            !mode.Equals("AutoCycle", StringComparison.OrdinalIgnoreCase) &&
+            !mode.Equals("Fixed", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { error = $"Invalid mode '{mode}'. Must be Latest, AutoCycle, or Fixed." });
+        }
+
+        if (mode.Equals("Fixed", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!validRaids.Contains(req.FixedId))
+                return BadRequest(new { error = $"Invalid raid ID {req.FixedId}. Please select a valid boss from the list." });
+
+            GameConfig.Root.SoloRaidFixedId = req.FixedId;
+            GameConfig.Root.SoloRaidMode = "Fixed";
+        }
+        else if (mode.Equals("AutoCycle", StringComparison.OrdinalIgnoreCase))
+        {
+            GameConfig.Root.SoloRaidMode = "AutoCycle";
+        }
+        else
+        {
+            GameConfig.Root.SoloRaidMode = "Latest";
+        }
+
+        GameConfig.Save();
+
+        int newActiveId = SoloRaidHelper.GetRaidId();
+        string newActiveName = SoloRaidHelper.GetBossName(newActiveId);
+
+        Logging.WriteLine($"[Admin] Solo Raid boss configuration updated to mode={GameConfig.Root.SoloRaidMode}, activeId={newActiveId} ({newActiveName})", LogType.Info);
+
+        return Ok(new
+        {
+            ok = true,
+            mode = GameConfig.Root.SoloRaidMode,
+            activeId = newActiveId,
+            activeName = newActiveName,
+            message = $"Solo Raid updated! Mode: {GameConfig.Root.SoloRaidMode}, Active Boss: {newActiveName} (ID: {newActiveId})"
+        });
     }
 
     private static SoloRaidMuseumLogModel ToMuseumLogModel(SoloRaidMuseumLogData log) => new()
