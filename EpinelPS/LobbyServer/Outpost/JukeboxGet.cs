@@ -5,15 +5,22 @@ public class JukeboxPlaylistGet : LobbyMessage
 {
     protected override async Task HandleAsync()
     {
-        ReqGetJukeboxPlaylist req = await ReadData<ReqGetJukeboxPlaylist>();
-        User user = GetUser();
-
+        // Prepare response with static data
         ResGetJukeboxPlaylist response = new()
         {
-            FavoriteSongs = user.FavoriteSongs
+            Playlists = { }, // Assuming Playlists is a list or similar collection type, you may want to add items here.
+            FavoriteSongs = new NetJukeboxFavorite
+            {
+                Songs =
+                {
+                    new NetJukeboxPlaylistSong { JukeboxTableId = 8995001,Order = 899 },
+                    new NetJukeboxPlaylistSong { JukeboxTableId = 9020001, Order = 902 }
+                }
+            },
+            // JukeboxPlaylistUId = 123456789 // Assign a static UID, if required
         };
-        response.Playlists.AddRange(user.PlayLists);
 
+        // Send the response
         await WriteDataAsync(response);
     }
 }
