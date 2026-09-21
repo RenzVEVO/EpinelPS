@@ -12,6 +12,6 @@
   "EnablePurchaseSimulation": true,
   "ArchiveUnlockAll": false,
   "TargetVersion": "152.8.11",
-  "SoloRaidMode": "AutoCycle",
+  "SoloRaidMode": "Latest",
   "SoloRaidFixedId": 0
 }
