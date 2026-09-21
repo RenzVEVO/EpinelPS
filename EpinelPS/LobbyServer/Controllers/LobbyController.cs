@@ -45,7 +45,7 @@ public class LobbyController(IUserService UserService, GameContext db) : Control
             OutpostBattleLevel = user.OutpostBattleLevel,
             OutpostBattleTime = new NetOutpostBattleTime() { MaxBattleTime = 864000000000, MaxOverBattleTime = 12096000000000, BattleTime = battleTimeMs },
 
-            Jukeboxv2 = new NetUserJukeboxDataV2() { CommandBgm = new NetJukeboxBgm() { JukeboxTableId = user.CommanderMusic.TableId, Type = NetJukeboxBgmType.JukeboxTableId, Location = NetJukeboxLocation.CommanderRoom } }
+            Jukeboxv2 = new NetUserJukeboxDataV2() { CommandBgm = JukeboxUtils.BuildCurrentBgm(user, NetJukeboxLocation.CommanderRoom) }
         };
 
         response.Jukeboxv2.JukeboxTableIds.AddRange(JukeboxUtils.GetUnlockedSongs(user));
@@ -134,6 +134,17 @@ public class LobbyController(IUserService UserService, GameContext db) : Control
         response.OwnedLobbyDecoBackgroundIdList.AddRange(user.LobbyDecoBackgroundList);
 
         response.ClearLessons.AddRange(user.CompletedTacticAcademyLessons);
+
+        response.WallpaperList.AddRange(user.WallpaperList);
+        response.WallpaperPlaylistList.AddRange(user.WallpaperPlaylistList.Where(wp => user.PlayLists.Any(p => p.JukeboxPlaylistUid == wp.PlaylistUId)));
+        response.WallpaperJukeboxList.AddRange(user.WallpaperJukeboxList);
+        response.WallpaperBackgroundList.AddRange(user.WallpaperBackground);
+        response.WallpaperFavoriteList.AddRange(user.WallpaperFavoriteList);
+        response.Playlists.AddRange(user.PlayLists);
+        if (user.FavoriteSongs != null)
+        {
+            response.FavoriteSongs = user.FavoriteSongs;
+        }
 
         return response;
     }
