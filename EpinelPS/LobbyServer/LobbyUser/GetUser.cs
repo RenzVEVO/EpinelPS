@@ -1,4 +1,4 @@
-﻿using EpinelPS.Data;
+using EpinelPS.Data;
 using EpinelPS.Database;
 using EpinelPS.Utils;
 
@@ -45,8 +45,8 @@ public class GetUser : LobbyMessage
             });
         }
 
-        response.CommanderRoomJukeboxBgm = new NetJukeboxBgm() { JukeboxTableId = user.CommanderMusic.TableId, Type = NetJukeboxBgmType.JukeboxTableId, Location = NetJukeboxLocation.CommanderRoom };
-        response.LobbyJukeboxBgm = new NetJukeboxBgm() { JukeboxTableId = user.LobbyMusic.TableId, Type = NetJukeboxBgmType.JukeboxTableId, Location = NetJukeboxLocation.Lobby };
+        response.CommanderRoomJukeboxBgm = JukeboxUtils.BuildCurrentBgm(user, NetJukeboxLocation.CommanderRoom);
+        response.LobbyJukeboxBgm = JukeboxUtils.BuildCurrentBgm(user, NetJukeboxLocation.Lobby);
 
         await WriteDataAsync(response);
     }

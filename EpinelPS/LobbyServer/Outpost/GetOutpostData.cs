@@ -29,7 +29,7 @@ public class GetOutpostData : LobbyMessage
         ResGetOutpostData response = new()
         {
             OutpostBattleLevel = user.OutpostBattleLevel,
-            Jukeboxv2 = new NetUserJukeboxDataV2() { CommandBgm = new() { Type = NetJukeboxBgmType.JukeboxTableId, JukeboxTableId = user.CommanderMusic.TableId } }
+            Jukeboxv2 = new NetUserJukeboxDataV2() { CommandBgm = JukeboxUtils.BuildCurrentBgm(user, NetJukeboxLocation.CommanderRoom) }
         };
 
         // TODO: do not hard code this!
