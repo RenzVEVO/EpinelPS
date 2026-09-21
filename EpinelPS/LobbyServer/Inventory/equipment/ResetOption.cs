@@ -25,6 +25,11 @@ public class ResetOption : LobbyMessage
         NetEquipmentAwakeningOption resetOption = new();
         Random random = new();
 
+        // Apply lock reservations sent from client
+        ApplyLockReservation(awakening.Option, 1, req.Slot1);
+        ApplyLockReservation(awakening.Option, 2, req.Slot2);
+        ApplyLockReservation(awakening.Option, 3, req.Slot3);
+
         (int optionId, bool isLocked, bool isDisposableLocked)[] slotLockInfo = new (int optionId, bool isLocked, bool isDisposableLocked)[3];
         List<int> lockedOptionStateEffectIds = new();
 
@@ -469,5 +474,40 @@ public class ResetOption : LobbyMessage
             return (costRecord.Costs[0].ItemId, costRecord.Costs[0].ItemValue);
         }
         return (7080001, 1); // Default material ID and cost
+    }
+
+    private static void ApplyLockReservation(NetEquipmentAwakeningOption option, int slot, AwakeningOptionLockReserveRequest request)
+    {
+        switch (request)
+        {
+            case AwakeningOptionLockReserveRequest.ReservePermanentLock:
+                SetSlotLock(option, slot, lockStatus: true, disposable: false);
+                break;
+            case AwakeningOptionLockReserveRequest.ReserveDisposableLock:
+                SetSlotLock(option, slot, lockStatus: true, disposable: true);
+                break;
+            case AwakeningOptionLockReserveRequest.NoReserve:
+            default:
+                break;
+        }
+    }
+
+    private static void SetSlotLock(NetEquipmentAwakeningOption option, int slot, bool lockStatus, bool disposable)
+    {
+        switch (slot)
+        {
+            case 1:
+                option.Option1Lock = lockStatus;
+                option.IsOption1DisposableLock = disposable;
+                break;
+            case 2:
+                option.Option2Lock = lockStatus;
+                option.IsOption2DisposableLock = disposable;
+                break;
+            case 3:
+                option.Option3Lock = lockStatus;
+                option.IsOption3DisposableLock = disposable;
+                break;
+        }
     }
 }
