@@ -243,8 +243,10 @@ public class RewardUtils
 
 
 
-            // Check if user already has said item. If it is level 1, increase item count.
-            DbItemData? existingItem = user.Items.FirstOrDefault(x => x.ItemType == rewardId && x.Level == 0 && x.Corp == corpId);
+            // Check if user already has said item. Non-equipment items should stack.
+            DbItemData? existingItem = rewardType.ToString().StartsWith("Equipment")
+                ? null
+                : user.Items.FirstOrDefault(x => x.ItemType == rewardId);
 
             if (existingItem != null && !rewardType.ToString().StartsWith("Equipment"))
             {
