@@ -15,7 +15,209 @@ namespace EpinelPS.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
+            modelBuilder
+                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("Proxies:ChangeTracking", false)
+                .HasAnnotation("Proxies:CheckEquality", false)
+                .HasAnnotation("Proxies:LazyLoading", true);
+
+            modelBuilder.Entity("EpinelPS.Models.CharacterModel", b =>
+                {
+                    b.Property<int>("Csn")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BondLevel")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BondLevelExp")
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("CompletedDialogs")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CostumeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Favorite")
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("FlushableWatchedDialogIds")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Grade")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsMainForce")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("NameCode")
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("ObtainedRewardLevels")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("RareType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RewardStatus")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Skill1Lvl")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Skill2Lvl")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Tid")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TotalCounseledCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UltimateLevel")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Csn");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("CharacterModel");
+                });
+
+            modelBuilder.Entity("EpinelPS.Models.ClearedTutorial", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("GameUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("GroupId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TutorialId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameUserId");
+
+                    b.ToTable("ClearedTutorial");
+                });
+
+            modelBuilder.Entity("EpinelPS.Models.CompletedFieldObject", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ActionAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<ulong?>("FieldInfoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Json")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PositionId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FieldInfoId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("CompletedFieldObject");
+                });
+
+            modelBuilder.Entity("EpinelPS.Models.CurrencyModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("GameUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameUserId");
+
+                    b.ToTable("CurrencyModel");
+                });
+
+            modelBuilder.Entity("EpinelPS.Models.FieldInfo", b =>
+                {
+                    b.Property<ulong>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("AcquiredPasswordList")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("BossEntered")
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("CompletedStages")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.PrimitiveCollection<string>("FieldItemTableIdList")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MapName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PositionJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.PrimitiveCollection<string>("UnlockedDoorList")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<ulong>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("FieldInfo");
+                });
 
             modelBuilder.Entity("EpinelPS.Models.GameUser", b =>
                 {
@@ -23,20 +225,136 @@ namespace EpinelPS.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime>("BanEnd")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("BanId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("BanStart")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("BattleTime")
+                        .HasColumnType("TEXT");
+
+                    b.PrimitiveCollection<string>("ClaimedJukeboxRewardTriggers")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.PrimitiveCollection<string>("DispatchClearList")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DispatchCollectionLv")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DispatchFavoriteLv")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DispatchLv")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DispatchResetCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ExperiencePoint")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("InfraCoreExp")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("InfraCoreLvl")
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("JukeboxBgm")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("LastAction")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("LastClearedDifficulty")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LastHardStageCleared")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LastNormalStageCleared")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LastStoryStageCleared")
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("Memorial")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Nickname")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("OutpostBattleLevel")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("OutpostBattleLevelExp")
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("ProfileCardsData")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProfileFrame")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ProfileIconId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("ProfileIconIsPrism")
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("RepresentationTeamDataNew")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TitleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UserLevel")
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("ViewedScenarios")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.HasKey("ID");
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("EpinelPS.Models.QuestProgress", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("GameUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsRewardRecieved")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("QuestId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameUserId");
+
+                    b.ToTable("QuestProgress");
                 });
 
             modelBuilder.Entity("EpinelPS.Models.SdkUser", b =>
@@ -71,6 +389,39 @@ namespace EpinelPS.Migrations
                     b.ToTable("SdkUsers");
                 });
 
+            modelBuilder.Entity("EpinelPS.Models.TeamModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LastContentsTeamNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("SlotIdTypes")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.PrimitiveCollection<string>("SlotIds")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TeamNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TeamType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("TeamModel");
+                });
+
             modelBuilder.Entity("EpinelPS.Models.TriggerModelNew", b =>
                 {
                     b.Property<long>("Id")
@@ -99,6 +450,87 @@ namespace EpinelPS.Migrations
                     b.ToTable("Triggers");
                 });
 
+            modelBuilder.Entity("EpinelPS.Models.CharacterModel", b =>
+                {
+                    b.HasOne("EpinelPS.Models.GameUser", "User")
+                        .WithMany("Characters")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EpinelPS.Models.ClearedTutorial", b =>
+                {
+                    b.HasOne("EpinelPS.Models.GameUser", "GameUser")
+                        .WithMany("Tutorials")
+                        .HasForeignKey("GameUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GameUser");
+                });
+
+            modelBuilder.Entity("EpinelPS.Models.CompletedFieldObject", b =>
+                {
+                    b.HasOne("EpinelPS.Models.FieldInfo", null)
+                        .WithMany("CompletedObjects")
+                        .HasForeignKey("FieldInfoId");
+
+                    b.HasOne("EpinelPS.Models.GameUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EpinelPS.Models.CurrencyModel", b =>
+                {
+                    b.HasOne("EpinelPS.Models.GameUser", "GameUser")
+                        .WithMany("Currency")
+                        .HasForeignKey("GameUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GameUser");
+                });
+
+            modelBuilder.Entity("EpinelPS.Models.FieldInfo", b =>
+                {
+                    b.HasOne("EpinelPS.Models.GameUser", "User")
+                        .WithMany("FieldInfo")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EpinelPS.Models.QuestProgress", b =>
+                {
+                    b.HasOne("EpinelPS.Models.GameUser", "GameUser")
+                        .WithMany("MainQuestData")
+                        .HasForeignKey("GameUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GameUser");
+                });
+
+            modelBuilder.Entity("EpinelPS.Models.TeamModel", b =>
+                {
+                    b.HasOne("EpinelPS.Models.GameUser", "User")
+                        .WithMany("Teams")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("EpinelPS.Models.TriggerModelNew", b =>
                 {
                     b.HasOne("EpinelPS.Models.GameUser", "User")
@@ -110,9 +542,26 @@ namespace EpinelPS.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("EpinelPS.Models.FieldInfo", b =>
+                {
+                    b.Navigation("CompletedObjects");
+                });
+
             modelBuilder.Entity("EpinelPS.Models.GameUser", b =>
                 {
+                    b.Navigation("Characters");
+
+                    b.Navigation("Currency");
+
+                    b.Navigation("FieldInfo");
+
+                    b.Navigation("MainQuestData");
+
+                    b.Navigation("Teams");
+
                     b.Navigation("Triggers");
+
+                    b.Navigation("Tutorials");
                 });
 #pragma warning restore 612, 618
         }

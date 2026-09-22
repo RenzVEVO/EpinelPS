@@ -36,16 +36,17 @@ internal class Program
                 return;
             }
             
-            if (args.Length == 0 || args[0] != "--headless")
-                await GitUpdateCheck.CheckForUpdates();
+            /*try
+            {
+                if (args.Length == 0 || args[0] != "--headless")
+                    await GitUpdateCheck.CheckForUpdates();
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine("Failed to check for updates: " + ex.Message);
+            }*/
 
             await GameData.CreateAsync();
-
-            Console.WriteLine("Initializing database");
-            JsonDb.Save();
-
-            Logging.WriteLine("Register handlers");
-            LobbyHandler.Init();
 
             Logging.WriteLine("Starting ASP.NET core on ports 80 and 443");
             WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -81,27 +82,10 @@ internal class Program
             string connectionType = builder.Configuration.GetConnectionString("EpinelPSConnectionType").ToLower();
             builder.Services.AddHttpContextAccessor();
             builder.Services.AddScoped<IUserService, UserService>();
-            builder.Services.AddDbContext<GameContext>(options =>
-            {
-                switch (connectionType?.ToLowerInvariant())
-                {
-                    case "sql":
-                        options.UseSqlServer(connectionString);
-                        break;
-
-                    case "mysql":
-                        options.UseMySQL(connectionString);
-                        break;
-
-                    case "npgsql":
-                        options.UseNpgsql(connectionString);
-                        break;
-
-                    default:
-                        options.UseSqlite(connectionString);
-                        break;
-                }
-            });
+            GameContext.SetOptions(connectionString, connectionType);
+            builder.Services.AddDbContext<GameContext>();
+            builder.Services.AddScoped<IInventoryService, InventoryService>();
+            builder.Services.AddProblemDetails();
             builder.Services.AddControllersWithViews(options =>
             {
                 options.AllowEmptyInputInBodyModelBinding = true;
@@ -124,15 +108,25 @@ internal class Program
 
             WebApplication app = builder.Build();
             CreateDbIfNotExists(app);
+
             app.UseDefaultFiles();
             app.UseStaticFiles();
+            app.UseExceptionHandler();
             app.UseMiddleware<EncryptionMiddleware>();
 
+            app.Use(async (context, next) =>
+            {
+                await next();
+
+                if (context.Response.StatusCode == 404)
+                {
+                    Logging.WriteLine($"Not Found: {context.Request.Method} {context.Request.Path}", LogType.Error);
+                }
+            });
 
             // app.UseHttpsRedirection();
 
             app.UseAuthorization();
-            //app.UseHttpsRedirection();
             app.UseRouting();
             app.MapControllerRoute(
        name: "default",

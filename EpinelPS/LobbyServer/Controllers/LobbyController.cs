@@ -11,10 +11,10 @@ namespace EpinelPS.LobbyServer.Controllers;
 /// Controller for lobby
 /// </summary>
 [ApiController]
-public class LobbyController(IUserService UserService, GameContext db) : Controller
+public class LobbyController(IUserService UserService, GameContext db, IInventoryService Inventory) : Controller
 {
     /// <summary>
-    /// Returns latest resource base URL for version number
+    /// Returns basic user information
     /// </summary>
     /// <param name="req"></param>
     /// <returns></returns>
@@ -22,12 +22,12 @@ public class LobbyController(IUserService UserService, GameContext db) : Control
     [HttpPost]
     public ActionResult<ResEnterLobbyServer> EnterLobbyServer([FromBodyProtobuf] ReqEnterLobbyServer req)
     {
-        User? user = UserService.GetUser();
+        GameUser? user = UserService.GetUser();
         if (user == null) return Problem(type: NetUtils.InvalidSessionErrorType);
 
         var userDB = db.Users.Find(user.ID);
 
-        TimeSpan battleTime = DateTime.UtcNow - user.BattleTime;
+       TimeSpan battleTime = DateTime.UtcNow - user.BattleTime;
         long battleTimeMs = (long)(battleTime.TotalNanoseconds / 100);
 
         // NOTE: Keep this in sync with GetUser code
@@ -42,27 +42,27 @@ public class LobbyController(IUserService UserService, GameContext db) : Control
             ResetHour = JsonDb.Instance.ResetHourUtcTime,
             Nickname = userDB.Nickname,
             SynchroLv = 1,
-            OutpostBattleLevel = user.OutpostBattleLevel,
+            OutpostBattleLevel = new NetOutpostBattleLevel() {Level = user.OutpostBattleLevel, Exp = user.OutpostBattleLevelExp},
             OutpostBattleTime = new NetOutpostBattleTime() { MaxBattleTime = 864000000000, MaxOverBattleTime = 12096000000000, BattleTime = battleTimeMs },
 
-            Jukeboxv2 = new NetUserJukeboxDataV2() { CommandBgm = new NetJukeboxBgm() { JukeboxTableId = user.CommanderMusic.TableId, Type = NetJukeboxBgmType.JukeboxTableId, Location = NetJukeboxLocation.CommanderRoom } }
+            Jukeboxv2 = new NetUserJukeboxDataV2() { CommandBgm = new NetJukeboxBgm() { JukeboxTableId = 5 /*user.CommanderMusic.TableId*/, Type = NetJukeboxBgmType.JukeboxTableId, Location = NetJukeboxLocation.CommanderRoom } }
         };
 
-        response.Jukeboxv2.JukeboxTableIds.AddRange(JukeboxUtils.GetUnlockedSongs(user));
+        //response.Jukeboxv2.JukeboxTableIds.AddRange(JukeboxUtils.GetUnlockedSongs(user));
 
 
 
-        foreach (KeyValuePair<CurrencyType, long> item in user.Currency)
+        foreach (var item in user.Currency)
         {
-            response.Currency.Add(new NetUserCurrencyData() { Type = (int)item.Key, Value = item.Value });
+            response.Currency.Add(new NetUserCurrencyData() { Type = (int)item.Type, Value = item.Amount });
         }
 
         foreach (CharacterModel item in user.Characters)
         {
-            response.Character.Add(new NetUserCharacterData() { Default = new() { Csn = item.Csn, Skill1Lv = item.Skill1Lvl, Skill2Lv = item.Skill2Lvl, CostumeId = item.CostumeId, Lv = user.GetCharacterLevel(item.Csn, item.Level), Grade = item.Grade, Tid = item.Tid, UltiSkillLv = item.UltimateLevel }, IsSynchro = user.GetSynchro(item.Csn) });
+            response.Character.Add(new NetUserCharacterData() { Default = new() { Csn = item.Csn, Skill1Lv = item.Skill1Lvl, Skill2Lv = item.Skill2Lvl, CostumeId = item.CostumeId, Lv = item.Level, Grade = item.Grade, Tid = item.Tid, UltiSkillLv = item.UltimateLevel } }); /*  IsSynchro = user.GetSynchro(item.Csn) */
         }
 
-        foreach (NetUserItemData item in NetUtils.GetUserItems(user))
+       /* foreach (NetUserItemData item in NetUtils.GetUserItems(user))
         {
             response.Items.Add(item);
         }
@@ -122,18 +122,126 @@ public class LobbyController(IUserService UserService, GameContext db) : Control
             response.Outposts.AddRange(defaultBuildings);
             user.OutpostBuildings = defaultBuildings;
             JsonDb.Save();
-        }
+        }*/
 
         response.LastClearedNormalMainStageId = user.LastNormalStageCleared;
         response.LastClearedStoryStageId = user.LastStoryStageCleared;
         response.LastClearedHardMainStageId = user.LastHardStageCleared;
         response.LastClearedMod = user.LastClearedDifficulty;
 
-        response.TimeRewardBuffs.AddRange(NetUtils.GetOutpostTimeReward(user));
+        /*response.TimeRewardBuffs.AddRange(NetUtils.GetOutpostTimeReward(user));
 
         response.OwnedLobbyDecoBackgroundIdList.AddRange(user.LobbyDecoBackgroundList);
 
-        response.ClearLessons.AddRange(user.CompletedTacticAcademyLessons);
+        response.ClearLessons.AddRange(user.CompletedTacticAcademyLessons);*/
+
+        return response;
+    }
+
+    [Route("/v1/lobby/retroactive")]
+    [HttpPost]
+    public ActionResult<ResRetroactive> LobbyRetroactive([FromBodyProtobuf] ReqRetroactive req)
+    {
+        GameUser? user = UserService.GetUser();
+        if (user == null) return Problem(type: NetUtils.InvalidSessionErrorType);
+
+        return new ResRetroactive();
+    }
+
+    [Route("/v1/badge/sync")]
+    [HttpPost]
+    public ActionResult<ResSyncBadge> BadgeSync([FromBodyProtobuf] ReqSyncBadge req)
+    {
+        GameUser? user = UserService.GetUser();
+        if (user == null) return Problem(type: NetUtils.InvalidSessionErrorType);
+
+        return new ResSyncBadge();
+    }
+
+    [Route("/v1/trigger/sync")]
+    [HttpPost]
+    ///<summary>
+    /// This request is responsible for fetching a log for daily, weekly, challenge mission completion.
+    /// </summary>
+    public ActionResult<ResSyncTrigger> TriggerSync([FromBodyProtobuf] ReqSyncTrigger req)
+    {
+        GameUser? user = UserService.GetUser();
+        if (user == null) return Problem(type: NetUtils.InvalidSessionErrorType);
+        var response = new ResSyncTrigger();
+
+        // This endpoint also returns the entire "history" for the account when 
+        // Seq = 0, which the client does when it is started for the first time, or when 
+        // the "Clear Cache" option is invoked. 
+        // When Seq = 0, the server limits the responses to 2000 items,
+        // and HasRemainData is set to true.
+        // TODO: Is it necessary to store the entire account history each time a stage
+        // is cleared, why does the official server do this?
+
+        TriggerModelNew[] newTriggers = [.. db.Triggers.Where(x => x.Id > req.Seq && x.UserId == user.ID)];
+
+        // Return all triggers
+        int triggerCount = 0;
+        foreach (TriggerModelNew item in newTriggers)
+        {
+            triggerCount++;
+
+            response.Triggers.Add(item.ToNet());
+
+            if (triggerCount >= 2000)
+            {
+                response.HasRemainData = true;
+                break;
+            }
+        }
+
+        return response;
+    }
+
+    [Route("/v1/Trigger/GetMainQuestData")]
+    [HttpPost]
+    public ActionResult<ResGetMainQuestData> GetMainQuestData([FromBodyProtobuf] ReqGetMainQuestData req)
+    {
+        GameUser? user = UserService.GetUser();
+        if (user == null) return Problem(type: NetUtils.InvalidSessionErrorType);
+        var response = new ResGetMainQuestData();
+
+        foreach (var item in user.MainQuestData)
+        {
+            response.MainQuestList.Add(new NetMainQuestData()
+            {
+               Tid = item.QuestId,
+               IsReceived = item.IsRewardRecieved 
+            });
+        }
+
+        return response;
+    }
+
+    [Route("/v1/trigger/obtainmainquestreward")]
+    [HttpPost]
+    public ActionResult<ResObtainMainQuestReward> ObtainMainQuestReward([FromBodyProtobuf] ReqObtainMainQuestReward req)
+    {
+        GameUser? user = UserService.GetUser();
+        if (user == null) return Problem(type: NetUtils.InvalidSessionErrorType);
+        var response = new ResObtainMainQuestReward();
+
+        List<NetRewardData> rewards = [];
+
+        foreach (var item in user.MainQuestData)
+        {
+            // give only rewards for things that were completed and not claimed already
+            if (!item.IsRewardRecieved && req.TidList.Contains(item.QuestId))
+            {
+                item.IsRewardRecieved = true;
+
+                MainQuestRecord? questInfo = GameData.Instance.GetMainQuestByTableId(item.QuestId) ?? throw new Exception("failed to lookup quest Id " + item.QuestId);
+                RewardRecord? reward = GameData.Instance.GetRewardTableEntry(questInfo.RewardId) ?? throw new Exception("failed to lookup reward Id " + questInfo.RewardId);
+                rewards.Add(Inventory.AddReward(user, reward));
+            }
+        }
+
+        response.Reward = Inventory.MergeRewards(user, rewards);
+        db.SaveChanges();
 
         return response;
     }

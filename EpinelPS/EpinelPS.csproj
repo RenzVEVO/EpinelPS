@@ -10,7 +10,7 @@
 		<SelfContained>true</SelfContained>
 		<IncludeNativeLibrariesForSelfExtract>True</IncludeNativeLibrariesForSelfExtract>
 		<NoWarn>$(NoWarn);SYSLIB0057</NoWarn>
-		<Version>0.149.0.0</Version>
+		<Version>0.152.0.0</Version>
 		<CETCompat>false</CETCompat>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<ImplicitUsings>enable</ImplicitUsings>
@@ -38,6 +38,7 @@
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		  <PrivateAssets>all</PrivateAssets>
 		</PackageReference>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.12" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" />
 		<PackageReference Include="MySql.EntityFrameworkCore" Version="10.0.7+MySQL9.7.0" />

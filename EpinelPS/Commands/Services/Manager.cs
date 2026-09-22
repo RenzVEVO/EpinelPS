@@ -14,7 +14,7 @@ public class Manager : ICommandRegistry
         Console.WriteLine($"[Manager] Registered {handlers.Count} handler(s)");
     }
 
-    public string? UserName => context.SelectedUser?.Username;
+    public string? UserName => context.SelectedUser?.Nickname;
 
     public IReadOnlyList<IHandlerInfo> GetHandlers() => registry.GetHandlers();
 

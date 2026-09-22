@@ -17,15 +17,15 @@ public class ShowUsersHandler(IExecutionContext context) : BaseHandler<ShowUsers
 
     protected async override Task<HandleResult> ExecuteAsync(ShowUsersParameter parameters)
     {
-        var users = JsonDb.Instance.Users;
-        if (users.Count == 0)
+        var users = GameContext.CreateNew().Users;
+        if (users.Count() == 0)
             return new HandleResult(true, "No users found in the database.");
 
         var sb = new StringBuilder();
         sb.AppendLine("ID\t\tUsername\tNickname");
         foreach (var user in users)
         {
-            sb.AppendLine($"{user.ID}\t{user.Username}\t{user.Nickname}");
+            sb.AppendLine($"{user.ID}\t{user.Nickname}");
         }
         return new HandleResult(true, sb.ToString().TrimEnd());
     }
