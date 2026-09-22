@@ -8,9 +8,7 @@ namespace EpinelPS.LobbyServer.Shop.InApp;
 
 internal static class InAppPurchaseHelper
 {
-    private static readonly ConcurrentDictionary<(ulong UserId, string ProductId), NetRewardData> PendingRewards = new();
     private static readonly ConcurrentDictionary<ulong, ConcurrentDictionary<int, (int ProductType, int ShopTid, int BuyCount)>> SessionClaimedPackages = new();
-    private static readonly ConcurrentDictionary<ulong, ConcurrentQueue<NetInAppShopReceivableProductData>> PendingReceivableProducts = new();
 
     public static bool TrySimulatePurchase(User user, string productId, NetStartPurchaseExtraData? extraData,
         out NetRewardData reward)
@@ -38,63 +36,27 @@ internal static class InAppPurchaseHelper
         if (!granted)
             return false;
 
-        PendingRewards[(user.ID, productId)] = reward.Clone();
-
-        var queue = PendingReceivableProducts.GetOrAdd(user.ID, _ => new ConcurrentQueue<NetInAppShopReceivableProductData>());
-        queue.Enqueue(new NetInAppShopReceivableProductData
-        {
-            ProductId = productId,
-            Token = $"tok-{Guid.NewGuid():N}",
-            SubTid = 0
-        });
-
         JsonDb.Save();
         return true;
     }
 
     public static bool HasPendingReward(ulong userId, string productId)
     {
-        return PendingRewards.ContainsKey((userId, productId));
+        return false;
     }
 
     public static void DiscardPendingReceivableProducts(ulong userId, string productId)
     {
-        if (PendingReceivableProducts.TryGetValue(userId, out var queue))
-        {
-            var remaining = new List<NetInAppShopReceivableProductData>();
-            while (queue.TryDequeue(out var item))
-            {
-                if (!string.Equals(item.ProductId, productId, StringComparison.OrdinalIgnoreCase))
-                {
-                    remaining.Add(item);
-                }
-            }
-            foreach (var item in remaining)
-            {
-                queue.Enqueue(item);
-            }
-        }
     }
 
     public static NetRewardData TakePendingReward(ulong userId, string productId)
     {
-        DiscardPendingReceivableProducts(userId, productId);
-        return PendingRewards.TryRemove((userId, productId), out var reward)
-            ? reward
-            : new NetRewardData { IsEmptyReward = true, PassPoint = new NetPassPointData() };
+        return new NetRewardData { IsEmptyReward = true, PassPoint = new NetPassPointData() };
     }
 
     public static List<NetInAppShopReceivableProductData> TakePendingReceivableProducts(ulong userId)
     {
-        List<NetInAppShopReceivableProductData> list = [];
-        if (PendingReceivableProducts.TryGetValue(userId, out var queue))
-        {
-            while (queue.TryDequeue(out var item))
-            {
-                list.Add(item);
-            }
-        }
-        return list;
+        return [];
     }
 
     public static bool HasClaimedFreePackageThisSession(ulong userId, int listTid)
