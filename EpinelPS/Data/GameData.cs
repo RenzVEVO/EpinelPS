@@ -230,6 +230,26 @@ public class GameData
     [LoadRecord("MonthlyAmountTable.json", "Id")]
     public readonly Dictionary<int, MonthlyAmountRecord> MonthlyAmountTable = [];
 
+    // EventBoxGacha tables
+    [LoadRecord("EventBoxGachaTable.json", "Id")]
+    public readonly Dictionary<int, EventBoxGachaRecord> EventBoxGachaTable = [];
+
+    [LoadRecord("EventBoxGachaPriceTable.json", "Id")]
+    public readonly Dictionary<int, EventBoxGachaPriceRecord> EventBoxGachaPriceTable = [];
+
+    [LoadRecord("EventBoxGachaProbTable.json", "Id")]
+    public readonly Dictionary<int, EventBoxGachaProbRecord> EventBoxGachaProbTable = [];
+
+    [LoadRecord("EventBoxGachaRewardTable.json", "Id")]
+    public readonly Dictionary<int, EventBoxGachaRewardRecord> EventBoxGachaRewardTable = [];
+
+    // EventInAppShop tables
+    [LoadRecord("EventInAppShopTable.json", "Id")]
+    public readonly Dictionary<int, EventInAppShopRecord> EventInAppShopTable = [];
+
+    [LoadRecord("EventInAppShopProductTable.json", "Id")]
+    public readonly Dictionary<int, EventInAppShopProductRecord> EventInAppShopProductTable = [];
+
     [LoadRecord("TowerTable.json", "Id")]
     public readonly Dictionary<int, TowerRecord> towerTable = [];
 
