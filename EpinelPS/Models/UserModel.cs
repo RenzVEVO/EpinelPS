@@ -98,6 +98,8 @@ public class User
     public UserPointData userPointData { get; set; } = new();
     public Dictionary<int, DateTime> MonthlySubscriptions { get; set; } = [];
     public Dictionary<int, DateTime> MonthlySubscriptionLastClaimed { get; set; } = [];
+    public Dictionary<int, UserEventBoxGachaData> EventBoxGachaData { get; set; } = [];
+    public Dictionary<int, int> EventInAppShopBuyCounts { get; set; } = [];
     public DateTime LastLogin { get; set; } = DateTime.UtcNow;
     public DateTime BattleTime { get; set; } = DateTime.UtcNow;
 
@@ -792,3 +794,10 @@ public class MessengerRepairAuditEntry
     public string Note { get; set; } = "";
     public NetMessage Message { get; set; } = new();
 }
+
+public class UserEventBoxGachaData
+{
+    public int GachaCount { get; set; }
+    public List<int> RewardOrders { get; set; } = [];
+}
+

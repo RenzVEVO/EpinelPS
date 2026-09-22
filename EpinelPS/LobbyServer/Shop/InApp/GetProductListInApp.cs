@@ -66,6 +66,17 @@ public class GetProductList : LobbyMessage
             });
         }
 
+        foreach (var (shopTid, count) in user.EventInAppShopBuyCounts)
+        {
+            response.BuyDataList.Add(new NetInAppShopBuyData
+            {
+                ProductType = (int)ProductType.EventInAppShop,
+                ShopTid = shopTid,
+                BuyCount = count,
+                ListTid = shopTid,
+            });
+        }
+
         await WriteDataAsync(response);
     }
 }

@@ -30,6 +30,7 @@ internal static class InAppPurchaseHelper
             ProductType.CostumeShop => GrantCostumeShop(user, midas.ProductId, ref reward),
             ProductType.PassCostumeShop => GrantPassCostumeShop(user, midas.ProductId, ref reward),
             ProductType.MonthlyAmount => GrantMonthlyAmount(user, midas.ProductId, ref reward),
+            ProductType.EventInAppShop => GrantEventInAppShop(user, midas.ProductId, ref reward),
             _ => false,
         };
 
@@ -163,6 +164,26 @@ internal static class InAppPurchaseHelper
         user.MonthlySubscriptions[monthlyAmountId] = newExpiry;
 
         return true;
+    }
+
+    private static bool GrantEventInAppShop(User user, int eventInAppShopProductId, ref NetRewardData reward)
+    {
+        if (!GameData.Instance.EventInAppShopProductTable.TryGetValue(eventInAppShopProductId, out var product))
+            return false;
+
+        bool granted = GrantPackageGroup(user, product.PackageGroupId, ref reward);
+        if (granted)
+        {
+            if (user.EventInAppShopBuyCounts.TryGetValue(eventInAppShopProductId, out var count))
+            {
+                user.EventInAppShopBuyCounts[eventInAppShopProductId] = count + 1;
+            }
+            else
+            {
+                user.EventInAppShopBuyCounts[eventInAppShopProductId] = 1;
+            }
+        }
+        return granted;
     }
 
     public static bool GrantPackageGroup(User user, int packageGroupId, ref NetRewardData reward, bool allowEmpty = false)
