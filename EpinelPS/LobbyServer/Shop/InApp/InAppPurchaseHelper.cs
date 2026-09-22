@@ -31,6 +31,7 @@ internal static class InAppPurchaseHelper
             ProductType.PassCostumeShop => GrantPassCostumeShop(user, midas.ProductId, ref reward),
             ProductType.MonthlyAmount => GrantMonthlyAmount(user, midas.ProductId, ref reward),
             ProductType.EventInAppShop => GrantEventInAppShop(user, midas.ProductId, ref reward),
+            ProductType.TTSAlbumShop => GrantTTSAlbumShop(user, midas.ProductId, ref reward),
             _ => false,
         };
 
@@ -51,8 +52,33 @@ internal static class InAppPurchaseHelper
         return true;
     }
 
+    public static bool HasPendingReward(ulong userId, string productId)
+    {
+        return PendingRewards.ContainsKey((userId, productId));
+    }
+
+    public static void DiscardPendingReceivableProducts(ulong userId, string productId)
+    {
+        if (PendingReceivableProducts.TryGetValue(userId, out var queue))
+        {
+            var remaining = new List<NetInAppShopReceivableProductData>();
+            while (queue.TryDequeue(out var item))
+            {
+                if (!string.Equals(item.ProductId, productId, StringComparison.OrdinalIgnoreCase))
+                {
+                    remaining.Add(item);
+                }
+            }
+            foreach (var item in remaining)
+            {
+                queue.Enqueue(item);
+            }
+        }
+    }
+
     public static NetRewardData TakePendingReward(ulong userId, string productId)
     {
+        DiscardPendingReceivableProducts(userId, productId);
         return PendingRewards.TryRemove((userId, productId), out var reward)
             ? reward
             : new NetRewardData { IsEmptyReward = true, PassPoint = new NetPassPointData() };
@@ -91,7 +117,7 @@ internal static class InAppPurchaseHelper
         return new Dictionary<int, (int, int, int)>();
     }
 
-    private static MidasProductRecord? FindMidasProduct(string productId)
+    public static MidasProductRecord? FindMidasProduct(string productId)
     {
         if (GameData.Instance.mediasProductTable.TryGetValue(productId, out var exact))
             return exact;
@@ -204,5 +230,36 @@ internal static class InAppPurchaseHelper
         if (!user.CostumeList.Contains(costumeId))
             user.CostumeList.Add(costumeId);
         reward.CharacterCostume.Add(costumeId);
+    }
+
+    private static bool GrantTTSAlbumShop(User user, int productId, ref NetRewardData reward)
+    {
+        var album = GameData.Instance.TTSAlbumShopTable.Values
+            .FirstOrDefault(x => x.MidasProductId == productId || x.Id == productId)
+            ?? GameData.Instance.TTSAlbumShopTable.Values.FirstOrDefault(x => x.Id == 1003);
+
+        int albumId = album?.Id ?? 1003;
+
+        if (!user.TTSGameData.TryGetValue(1, out var ttsData))
+        {
+            ttsData = new TtsDatas();
+            user.TTSGameData[1] = ttsData;
+        }
+
+        if (!ttsData.PurchasedAlbumIds.Contains(albumId))
+        {
+            ttsData.PurchasedAlbumIds.Add(albumId);
+        }
+
+        var allSongs = GameData.Instance.EventTTSSongManagerTable.Values.Select(x => x.Id).ToList();
+        foreach (var sId in allSongs)
+        {
+            if (!ttsData.UnlockSongId.Contains(sId))
+            {
+                ttsData.UnlockSongId.Add(sId);
+            }
+        }
+
+        return true;
     }
 }

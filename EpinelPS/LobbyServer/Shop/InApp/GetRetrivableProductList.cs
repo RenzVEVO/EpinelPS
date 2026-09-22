@@ -14,7 +14,10 @@ public class GetRetrivableProductList : LobbyMessage
         var pending = InAppPurchaseHelper.TakePendingReceivableProducts(user.ID);
         foreach (var item in pending)
         {
-            response.DataList.Add(item);
+            if (InAppPurchaseHelper.HasPendingReward(user.ID, item.ProductId))
+            {
+                response.DataList.Add(item);
+            }
         }
 
         await WriteDataAsync(response);
