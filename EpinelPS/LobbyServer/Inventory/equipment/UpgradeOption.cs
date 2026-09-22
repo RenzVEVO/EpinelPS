@@ -39,7 +39,8 @@ public class UpgradeOption : LobbyMessage
 
         (int optionId, bool isLocked, bool isDisposableLocked)[] slotLockInfo = new (int optionId, bool isLocked, bool isDisposableLocked)[3];
 
-        int lockedOptionCount = 0;
+        int permanentLockCount = 0;
+        int disposableLockCount = 0;
         for (int i = 1; i <= 3; i++)
         {
             int currentOptionId = GetOptionIdForSlot(awakening.Option, i);
@@ -48,24 +49,19 @@ public class UpgradeOption : LobbyMessage
 
             slotLockInfo[i - 1] = (currentOptionId, isLocked, isDisposableLocked);
 
-            if (isLocked || isDisposableLocked)
-                lockedOptionCount++;
+            if (isLocked)
+            {
+                if (isDisposableLocked)
+                    disposableLockCount++;
+                else
+                    permanentLockCount++;
+            }
         }
 
-        // Get cost ID for upgrade based on locked option count
-        int costId = GetUpgradeCostId(lockedOptionCount);
+        // Calculate material costs: CostGroupId 200 for UpgradeOption
+        (int moduleCost, int lockCost) = EquipmentUtils.CalculateAwakeningCosts(200, permanentLockCount, disposableLockCount);
 
-        // Query actual material ID and cost from CostTable.json
-        (int materialId, int materialCost) = GetMaterialInfo(costId);
-
-        DbItemData? material = user.Items.FirstOrDefault(x => x.ItemType == materialId);
-        if (material == null || material.Count < materialCost)
-        {
-            await WriteDataAsync(response);
-            return;
-        }
-
-        if (!EquipmentUtils.DeductMaterials(material, materialCost, user, response.Items))
+        if (!EquipmentUtils.DeductAwakeningMaterials(user, moduleCost, lockCost, response.Items))
         {
             await WriteDataAsync(response);
             return;
@@ -226,9 +222,18 @@ public class UpgradeOption : LobbyMessage
             throw new InvalidOperationException($"No awakening options found with state_effect_group_id {stateEffectGroupId}");
         }
 
-        return SelectOptionFromGroup(optionsInGroup);
-    }
+        // Prevent rolling the exact same ratio tier that is currently on the line
+        List<EquipmentOptionRecord> eligibleOptions = optionsInGroup
+            .Where(opt => opt.StateEffectList == null || !opt.StateEffectList.Any(se => se.StateEffectId == currentStateEffectId))
+            .ToList();
 
+        if (eligibleOptions.Count == 0)
+        {
+            eligibleOptions = optionsInGroup;
+        }
+
+        return SelectOptionFromGroup(eligibleOptions);
+    }
 
     private static readonly Random _random = new();
 
@@ -265,27 +270,6 @@ public class UpgradeOption : LobbyMessage
         }
         int fallbackIndex = _random.Next(lastOption.StateEffectList.Count);
         return lastOption.StateEffectList[fallbackIndex].StateEffectId;
-    }
-
-    private int GetUpgradeCostId(int lockedOptionCount)
-    {
-
-        // For upgrade operation, use cost_group_id 200
-        EquipmentOptionCostRecord? costRecord = GameData.Instance.EquipmentOptionCostTable.Values
-            .FirstOrDefault(x => x.CostGroupId == 200 && x.CostLevel == lockedOptionCount);
-
-        return costRecord?.CostId ?? 102001;
-    }
-
-    private static (int materialId, int materialCost) GetMaterialInfo(int costId)
-    {
-        if (GameData.Instance.costTable.TryGetValue(costId, out CostRecord? costRecord) &&
-            costRecord?.Costs != null &&
-            costRecord.Costs.Count > 0)
-        {
-            return (costRecord.Costs[0].ItemId, costRecord.Costs[0].ItemValue);
-        }
-        return (7080001, 1); // Default material ID and cost
     }
 
     private static void ApplyLockReservation(NetEquipmentAwakeningOption option, int slot, AwakeningOptionLockReserveRequest request)
