@@ -96,6 +96,8 @@ public class User
     public int InfraCoreLvl { get; set; } = 1;
     public Dictionary<int, bool> InfraCoreRewardReceived { get; set; } = [];
     public UserPointData userPointData { get; set; } = new();
+    public Dictionary<int, DateTime> MonthlySubscriptions { get; set; } = [];
+    public Dictionary<int, DateTime> MonthlySubscriptionLastClaimed { get; set; } = [];
     public DateTime LastLogin { get; set; } = DateTime.UtcNow;
     public DateTime BattleTime { get; set; } = DateTime.UtcNow;
 

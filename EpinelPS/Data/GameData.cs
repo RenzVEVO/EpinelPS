@@ -227,6 +227,9 @@ public class GameData
     [LoadRecord("PassCostumeShopTable.json", "Id")]
     public readonly Dictionary<int, PassCostumeShopRecord_Raw> PassCostumeShopTable = [];
 
+    [LoadRecord("MonthlyAmountTable.json", "Id")]
+    public readonly Dictionary<int, MonthlyAmountRecord> MonthlyAmountTable = [];
+
     [LoadRecord("TowerTable.json", "Id")]
     public readonly Dictionary<int, TowerRecord> towerTable = [];
 

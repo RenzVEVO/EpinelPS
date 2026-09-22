@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using EpinelPS.Data;
 using EpinelPS.Database;
+using EpinelPS.Models;
 using EpinelPS.Utils;
 
 namespace EpinelPS.LobbyServer.Shop.InApp;
@@ -8,6 +9,8 @@ namespace EpinelPS.LobbyServer.Shop.InApp;
 internal static class InAppPurchaseHelper
 {
     private static readonly ConcurrentDictionary<(ulong UserId, string ProductId), NetRewardData> PendingRewards = new();
+    private static readonly ConcurrentDictionary<ulong, ConcurrentDictionary<int, (int ProductType, int ShopTid, int BuyCount)>> SessionClaimedPackages = new();
+    private static readonly ConcurrentDictionary<ulong, ConcurrentQueue<NetInAppShopReceivableProductData>> PendingReceivableProducts = new();
 
     public static bool TrySimulatePurchase(User user, string productId, NetStartPurchaseExtraData? extraData,
         out NetRewardData reward)
@@ -26,6 +29,7 @@ internal static class InAppPurchaseHelper
             ProductType.PackageShop => GrantPackageShop(user, midas.ProductId, ref reward),
             ProductType.CostumeShop => GrantCostumeShop(user, midas.ProductId, ref reward),
             ProductType.PassCostumeShop => GrantPassCostumeShop(user, midas.ProductId, ref reward),
+            ProductType.MonthlyAmount => GrantMonthlyAmount(user, midas.ProductId, ref reward),
             _ => false,
         };
 
@@ -33,6 +37,15 @@ internal static class InAppPurchaseHelper
             return false;
 
         PendingRewards[(user.ID, productId)] = reward.Clone();
+
+        var queue = PendingReceivableProducts.GetOrAdd(user.ID, _ => new ConcurrentQueue<NetInAppShopReceivableProductData>());
+        queue.Enqueue(new NetInAppShopReceivableProductData
+        {
+            ProductId = productId,
+            Token = $"tok-{Guid.NewGuid():N}",
+            SubTid = 0
+        });
+
         JsonDb.Save();
         return true;
     }
@@ -42,6 +55,39 @@ internal static class InAppPurchaseHelper
         return PendingRewards.TryRemove((userId, productId), out var reward)
             ? reward
             : new NetRewardData { IsEmptyReward = true, PassPoint = new NetPassPointData() };
+    }
+
+    public static List<NetInAppShopReceivableProductData> TakePendingReceivableProducts(ulong userId)
+    {
+        List<NetInAppShopReceivableProductData> list = [];
+        if (PendingReceivableProducts.TryGetValue(userId, out var queue))
+        {
+            while (queue.TryDequeue(out var item))
+            {
+                list.Add(item);
+            }
+        }
+        return list;
+    }
+
+    public static bool HasClaimedFreePackageThisSession(ulong userId, int listTid)
+    {
+        return SessionClaimedPackages.TryGetValue(userId, out var userBuys) && userBuys.ContainsKey(listTid);
+    }
+
+    public static void RecordFreePackageClaimThisSession(ulong userId, int listTid, int productType, int shopTid)
+    {
+        var userBuys = SessionClaimedPackages.GetOrAdd(userId, _ => new ConcurrentDictionary<int, (int, int, int)>());
+        userBuys[listTid] = (productType, shopTid, 1);
+    }
+
+    public static IReadOnlyDictionary<int, (int ProductType, int ShopTid, int BuyCount)> GetSessionClaimedPackages(ulong userId)
+    {
+        if (SessionClaimedPackages.TryGetValue(userId, out var userBuys))
+        {
+            return userBuys;
+        }
+        return new Dictionary<int, (int, int, int)>();
     }
 
     private static MidasProductRecord? FindMidasProduct(string productId)
@@ -98,7 +144,28 @@ internal static class InAppPurchaseHelper
         return GrantPackageGroup(user, costume.PackageGroupId, ref reward, allowEmpty: true);
     }
 
-    private static bool GrantPackageGroup(User user, int packageGroupId, ref NetRewardData reward, bool allowEmpty = false)
+    private static bool GrantMonthlyAmount(User user, int monthlyAmountId, ref NetRewardData reward)
+    {
+        if (!GameData.Instance.MonthlyAmountTable.TryGetValue(monthlyAmountId, out var monthly))
+            return false;
+
+        // Grant initial purchase package group (e.g. 330 paid gems or 1210 paid gems)
+        GrantPackageGroup(user, monthly.BuyPackageGroupId, ref reward, allowEmpty: true);
+
+        // Register or extend subscription
+        int days = monthly.Period > 0 ? monthly.Period : 30;
+        DateTime now = DateTime.UtcNow;
+        DateTime newExpiry = now.AddDays(days);
+        if (user.MonthlySubscriptions.TryGetValue(monthlyAmountId, out var existingExpiry) && existingExpiry > now)
+        {
+            newExpiry = existingExpiry.AddDays(days);
+        }
+        user.MonthlySubscriptions[monthlyAmountId] = newExpiry;
+
+        return true;
+    }
+
+    public static bool GrantPackageGroup(User user, int packageGroupId, ref NetRewardData reward, bool allowEmpty = false)
     {
         var products = GameData.Instance.PackageGroupTable.Values
             .Where(x => x.PackageGroupId == packageGroupId)
