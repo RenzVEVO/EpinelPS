@@ -1,14 +1,21 @@
-﻿namespace EpinelPS.LobbyServer.Shop.InApp;
+using EpinelPS.Models;
+
+namespace EpinelPS.LobbyServer.Shop.InApp;
 
 [GameRequest("/inappshop/getreceivableproductlist")]
 public class GetRetrivableProductList : LobbyMessage
 {
     protected override async Task HandleAsync()
     {
-        ReqGetInAppShopReceivableProductList x = await ReadData<ReqGetInAppShopReceivableProductList>();
+        _ = await ReadData<ReqGetInAppShopReceivableProductList>();
+        User user = GetUser();
 
         ResGetInAppShopReceivableProductList response = new();
-        // TODO
+        var pending = InAppPurchaseHelper.TakePendingReceivableProducts(user.ID);
+        foreach (var item in pending)
+        {
+            response.DataList.Add(item);
+        }
 
         await WriteDataAsync(response);
     }
