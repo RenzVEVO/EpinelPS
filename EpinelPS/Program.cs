@@ -50,6 +50,9 @@ internal class Program
             await GameData.CreateAsync();
             foreach (var user in JsonDb.Instance.Users)
             {
+                // Purge any cursed/broken characters (like Belorta Alt) or clone duplicates from past shenanigans
+                AdminCommands.SanitizeUserCharacters(user);
+
                 if (user.LastNormalStageCleared >= 6000002)
                 {
                     ClearStage.EnsureDefaultCharacters(user);
