@@ -1,4 +1,4 @@
-﻿using EpinelPS.Data;
+using EpinelPS.Data;
 using EpinelPS.Database;
 using EpinelPS.Utils;
 
@@ -27,6 +27,11 @@ public class Obtain2 : LobbyMessage
 
             }
             mailData.State = 2;
+
+            if (!user.MailDatas.Values.Any(m => m.State == 1 && m.HasReward))
+            {
+                user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.Mailbox || b.BadgeContent == BadgeContents.MailboxMessage);
+            }
 
             response.Data = mailData;
             response.Result = ObtainMailResult.Success;
