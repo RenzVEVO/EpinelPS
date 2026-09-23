@@ -382,6 +382,17 @@ public class BadgeModel
             Seq = Seq
         };
     }
+
+    public NetUniqueBadge ToUniqueNet()
+    {
+        return new NetUniqueBadge()
+        {
+            BadgeContent = BadgeContent,
+            BadgeGuid = ByteString.CopyFrom(new Guid(BadgeGuid).ToByteArray()),
+            Location = Location,
+            Seq = Seq
+        };
+    }
 }
 
 public class TriggerModel
