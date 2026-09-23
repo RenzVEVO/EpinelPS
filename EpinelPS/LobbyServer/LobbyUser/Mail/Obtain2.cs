@@ -28,6 +28,7 @@ public class Obtain2 : LobbyMessage
             }
             mailData.State = 2;
 
+            user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.MailboxMessage && b.Location == mailData.Msn.ToString());
             if (!user.MailDatas.Values.Any(m => m.State == 1 && m.HasReward))
             {
                 user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.Mailbox || b.BadgeContent == BadgeContents.MailboxMessage);

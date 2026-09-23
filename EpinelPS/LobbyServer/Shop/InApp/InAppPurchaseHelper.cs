@@ -211,21 +211,9 @@ internal static class InAppPurchaseHelper
 
         int days = monthly.Period > 0 ? monthly.Period : 30;
         DateTime now = DateTime.UtcNow;
-        DateTime newExpiry = now.AddDays(days);
-        if (user.MonthlySubscriptions.TryGetValue(monthlyAmountId, out var existingExpiry) && existingExpiry > now)
-        {
-            newExpiry = existingExpiry.AddDays(days);
-        }
-        user.MonthlySubscriptions[monthlyAmountId] = newExpiry;
-
-        if (user.MonthlySubscriptionRemainingClaims.TryGetValue(monthlyAmountId, out var remaining) && remaining > 0)
-        {
-            user.MonthlySubscriptionRemainingClaims[monthlyAmountId] = remaining + days;
-        }
-        else
-        {
-            user.MonthlySubscriptionRemainingClaims[monthlyAmountId] = days;
-        }
+        // Strictly cap to 30 days and 30 remaining claims max for the month (does not stack to 60+ upon repurchase)
+        user.MonthlySubscriptions[monthlyAmountId] = now.AddDays(days);
+        user.MonthlySubscriptionRemainingClaims[monthlyAmountId] = days;
 
         return true;
     }
@@ -263,13 +251,13 @@ internal static class InAppPurchaseHelper
 
         NetUserMailData mail = new()
         {
-            Sender = 100, // System / Cash Shop
+            Sender = 1, // 1 = System / Shifty portrait
             Msn = msn,
             CreatedAt = DateTime.UtcNow.Ticks,
             HasReward = true,
-            Nickname = "Cash Shop",
+            Nickname = "Cash Shop", // Displays "From. Cash Shop"
             Title = new() { IsPlain = true, Str = title },
-            Text = new() { IsPlain = true, Str = "Thank you for your purchase! Your package items are attached." },
+            Text = new() { IsPlain = true, Str = $"Items from your {title} purchase have arrived! Thank you for purchasing from the Cash Shop." },
             State = 1, // 1 = Unclaimed
             Type = 1,
             Period = 30
@@ -285,6 +273,17 @@ internal static class InAppPurchaseHelper
             BadgeContent = BadgeContents.Mailbox,
             BadgeGuid = Guid.NewGuid().ToString(),
             Location = "",
+            Seq = user.LastBadgeSeq
+        });
+
+        // Add MailboxMessage badge for this specific mail item (for red dot on the item inside mailbox)
+        user.LastBadgeSeq++;
+        user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.MailboxMessage && b.Location == mail.Msn.ToString());
+        user.Badges.Add(new BadgeModel
+        {
+            BadgeContent = BadgeContents.MailboxMessage,
+            BadgeGuid = Guid.NewGuid().ToString(),
+            Location = mail.Msn.ToString(),
             Seq = user.LastBadgeSeq
         });
     }

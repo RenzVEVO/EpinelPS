@@ -230,6 +230,9 @@ public class GameData
     [LoadRecord("MonthlyAmountTable.json", "Id")]
     public readonly Dictionary<int, MonthlyAmountRecord> MonthlyAmountTable = [];
 
+    [LoadRecord("MailSenderTable.json", "Id")]
+    public readonly Dictionary<int, MailSenderRecord> MailSenderTable = [];
+
     // EventBoxGacha tables
     [LoadRecord("EventBoxGachaTable.json", "Id")]
     public readonly Dictionary<int, EventBoxGachaRecord> EventBoxGachaTable = [];
