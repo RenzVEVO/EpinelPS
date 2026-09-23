@@ -1,4 +1,4 @@
-﻿
+
 using EpinelPS.Data;
 using EpinelPS.Database;
 using EpinelPS.Utils;
@@ -32,8 +32,8 @@ public class GachaUtils
         {
             // Remove the .Values part since it's already a list.
             // Group by NameCode to treat same NameCode as one character 
-            // Always add characters with GradeCoreId == 1 and 101
-            List<CharacterRecord> allCharacterData = [.. entireallCharacterData.GroupBy(c => c.NameCode).SelectMany(g => g.Where(c => c.GradeCoreId == 1 || c.GradeCoreId == 101 || c.GradeCoreId == 201 || c.NameCode == 3999))];
+            // Always add characters with GradeCoreId == 1, 101, or 201 that are officially released/visible
+            List<CharacterRecord> allCharacterData = [.. entireallCharacterData.GroupBy(c => c.NameCode).SelectMany(g => g.Where(c => (c.IsVisible && (c.GradeCoreId == 1 || c.GradeCoreId == 101 || c.GradeCoreId == 201)) || c.NameCode == 3999))];
 
             // Old selection method: Randomly select characters based on req.Count value, excluding characters in the sickPullsExclusionList
             selectedCharacters = [.. allCharacterData.Where(c => !sickPullsExclusionList.Contains(c.Id)).OrderBy(x => random.Next()).Take(numberOfPulls)]; // Exclude characters based on the exclusion list for sick pulls
