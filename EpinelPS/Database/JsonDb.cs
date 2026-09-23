@@ -62,11 +62,10 @@ internal class JsonDb
                 Instance.EncryptionTokenKey = pasetoKey.Key.ToArray();
             }
 
-            Save();
-
             Logging.SetOutputLevel(Instance.LogLevel);
 
             ValidateDb();
+            Save();
             Console.WriteLine("JsonDb: Loaded");
         }
         else
@@ -89,6 +88,7 @@ internal class JsonDb
         if (j != null)
         {
             Instance = j;
+            ValidateDb();
             Console.WriteLine("Database reload complete.");
         }
     }
@@ -97,6 +97,17 @@ internal class JsonDb
     {
         foreach (var user in Instance.Users)
         {
+            // Reset daily tribe tower turn attempts on server boot
+            if (user.ResetableData == null)
+            {
+                user.ResetableData = new();
+            }
+            else
+            {
+                user.ResetableData.TowerCount = Enum.GetValues<CorporationTowerType>()
+                    .ToDictionary(t => t, _ => 0);
+            }
+
             // check if character level is valid
             foreach (var c in user.Characters)
             {
