@@ -12,56 +12,29 @@ public class SyncBadge : LobbyMessage
 
         ResSyncBadge response = new();
 
-        long maxClientSeq = Math.Max(req.LastBadgeSeq, req.LastUniqueBadgeSeq);
-        if (maxClientSeq > user.LastBadgeSeq)
+        if (req.LastBadgeSeq > user.LastBadgeSeq)
         {
-            user.LastBadgeSeq = maxClientSeq;
+            user.LastBadgeSeq = req.LastBadgeSeq;
         }
 
-        var unclaimedMails = user.MailDatas.Values.Where(m => m.State == 1 && m.HasReward).ToList();
-        if (unclaimedMails.Count > 0)
+        // Clean up any legacy MailboxMessage badges that cause client-side SyncedBadgeHandler crash
+        user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.MailboxMessage);
+
+        bool hasUnclaimedMail = user.MailDatas.Values.Any(m => m.State == 1 && m.HasReward);
+        if (hasUnclaimedMail)
         {
-            // 1. Ensure Mailbox badge exists for lobby header envelope icon
             var existingMailboxBadge = user.Badges.FirstOrDefault(b => b.BadgeContent == BadgeContents.Mailbox);
-            if (existingMailboxBadge == null || existingMailboxBadge.Seq <= maxClientSeq)
+            if (existingMailboxBadge == null)
             {
-                if (existingMailboxBadge != null)
-                {
-                    user.Badges.Remove(existingMailboxBadge);
-                }
-                user.LastBadgeSeq = Math.Max(user.LastBadgeSeq, maxClientSeq) + 1;
-                user.Badges.Add(new BadgeModel
+                user.LastBadgeSeq++;
+                existingMailboxBadge = new BadgeModel
                 {
                     BadgeContent = BadgeContents.Mailbox,
                     BadgeGuid = Guid.NewGuid().ToString(),
-                    Location = "",
+                    Location = string.Empty,
                     Seq = user.LastBadgeSeq
-                });
-            }
-
-            // 2. Ensure each unclaimed mail message has a MailboxMessage badge (red dot on item card in mailbox)
-            var unclaimedMsns = unclaimedMails.Select(m => m.Msn.ToString()).ToHashSet();
-            user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.MailboxMessage && !unclaimedMsns.Contains(b.Location));
-
-            foreach (var mail in unclaimedMails)
-            {
-                string loc = mail.Msn.ToString();
-                var existingMsgBadge = user.Badges.FirstOrDefault(b => b.BadgeContent == BadgeContents.MailboxMessage && b.Location == loc);
-                if (existingMsgBadge == null || existingMsgBadge.Seq <= maxClientSeq)
-                {
-                    if (existingMsgBadge != null)
-                    {
-                        user.Badges.Remove(existingMsgBadge);
-                    }
-                    user.LastBadgeSeq = Math.Max(user.LastBadgeSeq, maxClientSeq) + 1;
-                    user.Badges.Add(new BadgeModel
-                    {
-                        BadgeContent = BadgeContents.MailboxMessage,
-                        BadgeGuid = Guid.NewGuid().ToString(),
-                        Location = loc,
-                        Seq = user.LastBadgeSeq
-                    });
-                }
+                };
+                user.Badges.Add(existingMailboxBadge);
             }
         }
         else
@@ -72,7 +45,6 @@ public class SyncBadge : LobbyMessage
         foreach (BadgeModel item in user.Badges)
         {
             response.BadgeList.Add(item.ToNet());
-            response.UniqueBadgeList.Add(item.ToUniqueNet());
         }
 
         JsonDb.Save();

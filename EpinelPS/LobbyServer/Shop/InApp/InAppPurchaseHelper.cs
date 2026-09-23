@@ -265,25 +265,14 @@ internal static class InAppPurchaseHelper
         mail.Items.AddRange(items);
         user.MailDatas.TryAdd(mail.Msn, mail);
 
-        // Ensure Mailbox badge is present with new Seq so red dot appears immediately upon lobby return
+        // Ensure Mailbox badge is present with new Seq so red dot appears upon lobby badge sync
         user.LastBadgeSeq = Math.Max(user.LastBadgeSeq, 2000) + 1;
-        user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.Mailbox);
+        user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.Mailbox || b.BadgeContent == BadgeContents.MailboxMessage);
         user.Badges.Add(new BadgeModel
         {
             BadgeContent = BadgeContents.Mailbox,
             BadgeGuid = Guid.NewGuid().ToString(),
-            Location = "",
-            Seq = user.LastBadgeSeq
-        });
-
-        // Add MailboxMessage badge for this specific mail item (for red dot on the item inside mailbox)
-        user.LastBadgeSeq++;
-        user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.MailboxMessage && b.Location == mail.Msn.ToString());
-        user.Badges.Add(new BadgeModel
-        {
-            BadgeContent = BadgeContents.MailboxMessage,
-            BadgeGuid = Guid.NewGuid().ToString(),
-            Location = mail.Msn.ToString(),
+            Location = string.Empty,
             Seq = user.LastBadgeSeq
         });
     }
