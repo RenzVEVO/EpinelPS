@@ -21,20 +21,28 @@ internal static class InAppPurchaseHelper
         if (midas == null || !midas.IsActive)
             return false;
 
+        var mailItems = new List<NetMailRewardItem>();
+        string mailTitle = "Cash Shop Purchase Delivery";
+
         bool granted = midas.ProductType switch
         {
-            ProductType.CashShop => GrantCashShop(user, midas.ProductId, ref reward),
-            ProductType.PackageShop => GrantPackageShop(user, midas.ProductId, ref reward),
-            ProductType.CostumeShop => GrantCostumeShop(user, midas.ProductId, ref reward),
-            ProductType.PassCostumeShop => GrantPassCostumeShop(user, midas.ProductId, ref reward),
-            ProductType.MonthlyAmount => GrantMonthlyAmount(user, midas.ProductId, ref reward),
-            ProductType.EventInAppShop => GrantEventInAppShop(user, midas.ProductId, ref reward),
+            ProductType.CashShop => GrantCashShopPurchase(user, midas.ProductId, mailItems, ref mailTitle),
+            ProductType.PackageShop => GrantPackageShopPurchase(user, midas.ProductId, mailItems, ref mailTitle),
+            ProductType.CostumeShop => GrantCostumeShopPurchase(user, midas.ProductId, mailItems, ref mailTitle),
+            ProductType.PassCostumeShop => GrantPassCostumeShopPurchase(user, midas.ProductId, mailItems, ref mailTitle),
+            ProductType.MonthlyAmount => GrantMonthlyAmountPurchase(user, midas.ProductId, mailItems, ref mailTitle),
+            ProductType.EventInAppShop => GrantEventInAppShopPurchase(user, midas.ProductId, mailItems, ref mailTitle),
             ProductType.TTSAlbumShop => GrantTTSAlbumShop(user, midas.ProductId, ref reward),
             _ => false,
         };
 
         if (!granted)
             return false;
+
+        if (mailItems.Count > 0)
+        {
+            DeliverPurchaseToMail(user, mailTitle, mailItems);
+        }
 
         JsonDb.Save();
         return true;
@@ -89,59 +97,118 @@ internal static class InAppPurchaseHelper
             string.Equals(x.MidasProductIdGamamobi, productId, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool GrantCashShop(User user, int cashShopId, ref NetRewardData reward)
+    private static List<NetMailRewardItem> GetPackageGroupMailItems(int packageGroupId)
+    {
+        var items = new List<NetMailRewardItem>();
+        var products = GameData.Instance.PackageGroupTable.Values
+            .Where(x => x.PackageGroupId == packageGroupId)
+            .ToList();
+
+        long expiry = DateTime.UtcNow.AddDays(30).Ticks;
+        foreach (var product in products)
+        {
+            items.Add(new NetMailRewardItem
+            {
+                RewardType = (int)product.ProductType,
+                RewardId = product.ProductId,
+                RewardValue = product.ProductValue,
+                ExpiredAt = expiry,
+            });
+        }
+
+        return items;
+    }
+
+    private static bool GrantCashShopPurchase(User user, int cashShopId, List<NetMailRewardItem> mailItems, ref string mailTitle)
     {
         if (!GameData.Instance.CashShopRecords.TryGetValue(cashShopId, out var product) || !product.IsActive)
             return false;
 
+        if (!string.IsNullOrEmpty(product.NameLocalkey))
+            mailTitle = product.NameLocalkey;
+
+        long expiry = DateTime.UtcNow.AddDays(30).Ticks;
         switch (product.ProductType)
         {
             case CashShopProductType.Currency:
-                RewardUtils.AddSingleObject(user, ref reward, product.ProductId, RewardType.Currency, product.ProductValue);
+                mailItems.Add(new NetMailRewardItem
+                {
+                    RewardType = (int)RewardType.Currency,
+                    RewardId = product.ProductId,
+                    RewardValue = product.ProductValue,
+                    ExpiredAt = expiry,
+                });
                 return true;
             case CashShopProductType.Item:
-                RewardUtils.AddSingleObject(user, ref reward, product.ProductId, RewardType.Item, product.ProductValue);
+                mailItems.Add(new NetMailRewardItem
+                {
+                    RewardType = (int)RewardType.Item,
+                    RewardId = product.ProductId,
+                    RewardValue = product.ProductValue,
+                    ExpiredAt = expiry,
+                });
                 return true;
             case CashShopProductType.Package:
-                return GrantPackageGroup(user, product.ProductId, ref reward);
+                mailItems.AddRange(GetPackageGroupMailItems(product.ProductId));
+                return true;
             default:
                 return false;
         }
     }
 
-    private static bool GrantPackageShop(User user, int packageShopId, ref NetRewardData reward)
+    private static bool GrantPackageShopPurchase(User user, int packageShopId, List<NetMailRewardItem> mailItems, ref string mailTitle)
     {
-        return GameData.Instance.PackageShopTable.TryGetValue(packageShopId, out var package) &&
-               GrantPackageGroup(user, package.PackageGroupId, ref reward);
+        if (!GameData.Instance.PackageShopTable.TryGetValue(packageShopId, out var package))
+            return false;
+
+        mailTitle = "Package Shop Purchase";
+        mailItems.AddRange(GetPackageGroupMailItems(package.PackageGroupId));
+        return true;
     }
 
-    private static bool GrantCostumeShop(User user, int costumeShopId, ref NetRewardData reward)
+    private static bool GrantCostumeShopPurchase(User user, int costumeShopId, List<NetMailRewardItem> mailItems, ref string mailTitle)
     {
         if (!GameData.Instance.CostumeShopTable.TryGetValue(costumeShopId, out var costume) || !costume.IsActive)
             return false;
 
-        AddCostume(user, costume.CostumeId, ref reward);
-        return GrantPackageGroup(user, costume.PackageGroupId, ref reward, allowEmpty: true);
+        NetRewardData dummy = new();
+        AddCostume(user, costume.CostumeId, ref dummy);
+
+        mailTitle = "Costume Purchase";
+        if (costume.PackageGroupId > 0)
+        {
+            mailItems.AddRange(GetPackageGroupMailItems(costume.PackageGroupId));
+        }
+        return true;
     }
 
-    private static bool GrantPassCostumeShop(User user, int passCostumeShopId, ref NetRewardData reward)
+    private static bool GrantPassCostumeShopPurchase(User user, int passCostumeShopId, List<NetMailRewardItem> mailItems, ref string mailTitle)
     {
         if (!GameData.Instance.PassCostumeShopTable.TryGetValue(passCostumeShopId, out var costume))
             return false;
 
-        AddCostume(user, costume.CostumeId, ref reward);
-        return GrantPackageGroup(user, costume.PackageGroupId, ref reward, allowEmpty: true);
+        NetRewardData dummy = new();
+        AddCostume(user, costume.CostumeId, ref dummy);
+
+        mailTitle = "Pass Costume Purchase";
+        if (costume.PackageGroupId > 0)
+        {
+            mailItems.AddRange(GetPackageGroupMailItems(costume.PackageGroupId));
+        }
+        return true;
     }
 
-    private static bool GrantMonthlyAmount(User user, int monthlyAmountId, ref NetRewardData reward)
+    private static bool GrantMonthlyAmountPurchase(User user, int monthlyAmountId, List<NetMailRewardItem> mailItems, ref string mailTitle)
     {
         if (!GameData.Instance.MonthlyAmountTable.TryGetValue(monthlyAmountId, out var monthly))
             return false;
 
-        // Grant initial purchase package group (e.g. 330 paid gems or 1210 paid gems)
-        GrantPackageGroup(user, monthly.BuyPackageGroupId, ref reward, allowEmpty: true);
+        mailTitle = "30-Day Supply Purchase";
+        if (monthly.BuyPackageGroupId > 0)
+        {
+            mailItems.AddRange(GetPackageGroupMailItems(monthly.BuyPackageGroupId));
+        }
 
-        // Register or extend subscription
         int days = monthly.Period > 0 ? monthly.Period : 30;
         DateTime now = DateTime.UtcNow;
         DateTime newExpiry = now.AddDays(days);
@@ -150,28 +217,55 @@ internal static class InAppPurchaseHelper
             newExpiry = existingExpiry.AddDays(days);
         }
         user.MonthlySubscriptions[monthlyAmountId] = newExpiry;
-
         return true;
     }
 
-    private static bool GrantEventInAppShop(User user, int eventInAppShopProductId, ref NetRewardData reward)
+    private static bool GrantEventInAppShopPurchase(User user, int eventInAppShopProductId, List<NetMailRewardItem> mailItems, ref string mailTitle)
     {
         if (!GameData.Instance.EventInAppShopProductTable.TryGetValue(eventInAppShopProductId, out var product))
             return false;
 
-        bool granted = GrantPackageGroup(user, product.PackageGroupId, ref reward);
-        if (granted)
+        mailTitle = "Costume Gacha Package";
+        if (product.PackageGroupId > 0)
         {
-            if (user.EventInAppShopBuyCounts.TryGetValue(eventInAppShopProductId, out var count))
-            {
-                user.EventInAppShopBuyCounts[eventInAppShopProductId] = count + 1;
-            }
-            else
-            {
-                user.EventInAppShopBuyCounts[eventInAppShopProductId] = 1;
-            }
+            mailItems.AddRange(GetPackageGroupMailItems(product.PackageGroupId));
         }
-        return granted;
+
+        if (user.EventInAppShopBuyCounts.TryGetValue(eventInAppShopProductId, out var count))
+        {
+            user.EventInAppShopBuyCounts[eventInAppShopProductId] = count + 1;
+        }
+        else
+        {
+            user.EventInAppShopBuyCounts[eventInAppShopProductId] = 1;
+        }
+
+        return true;
+    }
+
+    private static void DeliverPurchaseToMail(User user, string title, List<NetMailRewardItem> items)
+    {
+        long msn = User.GenerateMsn();
+        while (user.MailDatas.ContainsKey(msn))
+        {
+            msn = User.GenerateMsn();
+        }
+
+        NetUserMailData mail = new()
+        {
+            Sender = 100, // System / Cash Shop
+            Msn = msn,
+            CreatedAt = DateTime.UtcNow.Ticks,
+            HasReward = true,
+            Nickname = "Cash Shop",
+            Title = new() { IsPlain = true, Str = title },
+            Text = new() { IsPlain = true, Str = "Thank you for your purchase! Your package items are attached." },
+            State = 1, // 1 = Unclaimed
+            Type = 1,
+            Period = 30
+        };
+        mail.Items.AddRange(items);
+        user.MailDatas.TryAdd(mail.Msn, mail);
     }
 
     public static bool GrantPackageGroup(User user, int packageGroupId, ref NetRewardData reward, bool allowEmpty = false)
