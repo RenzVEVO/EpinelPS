@@ -237,7 +237,10 @@ public static class MessengerMessageCreator
             item.Value.ConversationId == condition.Tid && item.Value.IsOpener);
         if (opener.Value == null)
         {
-            Logging.WriteLine($"[Messenger] Opener is missing from static data: user={user.ID}, MessengerCondition={condition.Id}, Tid={condition.Tid}", LogType.Warning, logToConsole);
+            // Shift Up's static data occasionally contains dialog sets (like Blanc m_ex_blanc_01 and Noir m_ex_noir_01)
+            // that completely lack any line flagged with IsOpener: true.
+            // This is a benign client data quirk; demoted to Debug to spare the console from strobe-light yellow panic.
+            Logging.WriteLine($"[Messenger] Opener is missing from static data: user={user.ID}, MessengerCondition={condition.Id}, Tid={condition.Tid}", LogType.Debug, logToConsole);
             return false;
         }
 
