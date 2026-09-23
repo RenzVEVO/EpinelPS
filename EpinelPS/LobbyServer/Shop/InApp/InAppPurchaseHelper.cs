@@ -203,7 +203,7 @@ internal static class InAppPurchaseHelper
         if (!GameData.Instance.MonthlyAmountTable.TryGetValue(monthlyAmountId, out var monthly))
             return false;
 
-        mailTitle = "30-Day Supply Purchase";
+        mailTitle = !string.IsNullOrEmpty(monthly.NameLocalkey) ? monthly.NameLocalkey : "30-Day Supply Purchase";
         if (monthly.BuyPackageGroupId > 0)
         {
             mailItems.AddRange(GetPackageGroupMailItems(monthly.BuyPackageGroupId));
@@ -217,6 +217,16 @@ internal static class InAppPurchaseHelper
             newExpiry = existingExpiry.AddDays(days);
         }
         user.MonthlySubscriptions[monthlyAmountId] = newExpiry;
+
+        if (user.MonthlySubscriptionRemainingClaims.TryGetValue(monthlyAmountId, out var remaining) && remaining > 0)
+        {
+            user.MonthlySubscriptionRemainingClaims[monthlyAmountId] = remaining + days;
+        }
+        else
+        {
+            user.MonthlySubscriptionRemainingClaims[monthlyAmountId] = days;
+        }
+
         return true;
     }
 
@@ -266,6 +276,17 @@ internal static class InAppPurchaseHelper
         };
         mail.Items.AddRange(items);
         user.MailDatas.TryAdd(mail.Msn, mail);
+
+        // Ensure Mailbox badge is present with new Seq so red dot appears immediately upon lobby return
+        user.LastBadgeSeq = Math.Max(user.LastBadgeSeq, 2000) + 1;
+        user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.Mailbox);
+        user.Badges.Add(new BadgeModel
+        {
+            BadgeContent = BadgeContents.Mailbox,
+            BadgeGuid = Guid.NewGuid().ToString(),
+            Location = "",
+            Seq = user.LastBadgeSeq
+        });
     }
 
     public static bool GrantPackageGroup(User user, int packageGroupId, ref NetRewardData reward, bool allowEmpty = false)

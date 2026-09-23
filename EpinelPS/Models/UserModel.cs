@@ -98,6 +98,7 @@ public class User
     public UserPointData userPointData { get; set; } = new();
     public Dictionary<int, DateTime> MonthlySubscriptions { get; set; } = [];
     public Dictionary<int, DateTime> MonthlySubscriptionLastClaimed { get; set; } = [];
+    public Dictionary<int, int> MonthlySubscriptionRemainingClaims { get; set; } = [];
     public Dictionary<int, UserEventBoxGachaData> EventBoxGachaData { get; set; } = [];
     public Dictionary<int, int> EventInAppShopBuyCounts { get; set; } = [];
     public DateTime LastLogin { get; set; } = DateTime.UtcNow;
