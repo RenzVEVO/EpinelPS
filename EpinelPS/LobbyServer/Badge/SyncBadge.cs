@@ -12,23 +12,22 @@ public class SyncBadge : LobbyMessage
 
         ResSyncBadge response = new();
 
-        if (req.LastBadgeSeq > user.LastBadgeSeq)
+        long maxClientSeq = Math.Max(req.LastBadgeSeq, req.LastUniqueBadgeSeq);
+        if (maxClientSeq > user.LastBadgeSeq)
         {
-            user.LastBadgeSeq = req.LastBadgeSeq;
+            user.LastBadgeSeq = maxClientSeq;
         }
 
-        // Clean up any legacy MailboxMessage badges that cause client-side SyncedBadgeHandler crash
+        // Clean up any legacy MailboxMessage badges that cause client-side SyncedBadgeHandler / ViewMail crash
         user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.MailboxMessage);
 
         bool hasUnclaimedMail = user.MailDatas.Values.Any(m => m.State == 1 && m.HasReward);
         if (hasUnclaimedMail)
         {
-            // CRITICAL: The official client only displays the red dot if the badge sequence
-            // is strictly greater than req.LastBadgeSeq. If the sequence is <= req.LastBadgeSeq,
-            // the client ignores it as already seen/acknowledged.
-            // By always ensuring a fresh sequence > req.LastBadgeSeq, the red dot is guaranteed
-            // to show on every sync as long as rewards remain unclaimed.
-            long freshSeq = Math.Max(user.LastBadgeSeq, req.LastBadgeSeq) + 1;
+            // CRITICAL: The lobby Mailbox header icon in the client is bound to UniqueBadgeList.
+            // Furthermore, the client only illuminates the red dot if the badge sequence
+            // is strictly greater than the client's acknowledged sequence (maxClientSeq).
+            long freshSeq = Math.Max(user.LastBadgeSeq, maxClientSeq) + 1;
             user.LastBadgeSeq = freshSeq;
 
             user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.Mailbox);
@@ -49,6 +48,7 @@ public class SyncBadge : LobbyMessage
         foreach (BadgeModel item in user.Badges)
         {
             response.BadgeList.Add(item.ToNet());
+            response.UniqueBadgeList.Add(item.ToUniqueNet());
         }
 
         JsonDb.Save();
