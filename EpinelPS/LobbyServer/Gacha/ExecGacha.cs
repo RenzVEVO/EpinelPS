@@ -1,4 +1,4 @@
-﻿//todo
+//todo
 //implement response.Reward 
 // and response.Currencies
 //NetUserCurrencyData fields Type 9000 and Value 150
@@ -225,7 +225,8 @@ public class ExecGacha : LobbyMessage
 
             response.Gacha.Add(gacha);
 
-            user.AddTrigger(Trigger.GachaCharacter, 0, 0);
+            // Daily 10002, Weekly 20001, and Recruitment achievements
+            user.AddTrigger(Trigger.GachaCharacter, 1, 0);
         }
 
         // A newly obtained character may satisfy a room unlock condition while

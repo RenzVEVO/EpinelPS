@@ -364,6 +364,14 @@ public class AdminCommands
             .OrderBy(stage => stage.Id)];
     }
 
+    public static List<CampaignStageRecord> GetHardMainStages(int campaignChapter)
+    {
+        return [.. GameData.Instance.GetStageIdsForChapter(campaignChapter, false)
+            .Select(stageId => GameData.Instance.GetStageData(stageId)
+                ?? throw new Exception("failed to find stage " + stageId))
+            .OrderBy(stage => stage.Id)];
+    }
+
 
     /// <summary>
     /// Cheat: enroll every subquest and create its starting Messenger opener.
@@ -945,6 +953,8 @@ public class AdminCommands
         {
             character.Level = level;
         }
+        user.AddTrigger(Trigger.CharacterLevelMax, level);
+        user.AddTrigger(Trigger.CharacterLevelUpCount, 1);
         Console.WriteLine("Set all characters' level to " + level);
         JsonDb.Save();
         return RunCmdResponse.OK;

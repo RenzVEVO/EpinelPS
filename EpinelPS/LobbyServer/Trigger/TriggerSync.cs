@@ -1,4 +1,5 @@
 using EpinelPS.Database;
+using EpinelPS.LobbyServer.Mission;
 using EpinelPS.Utils;
 
 namespace EpinelPS.LobbyServer.TriggerController;
@@ -10,6 +11,10 @@ public class TriggerSync : LobbyMessage
     {
         ReqSyncTrigger req = await ReadData<ReqSyncTrigger>();
         User user = GetUser();
+
+        // Reconcile and backfill any earned milestones (e.g. character level 20, 40, 60... 300)
+        // so the client immediately receives all triggers ready for claiming.
+        MissionReconciler.ReconcileAll(user);
 
         // This request is responsible for fetching a log for
         // daily, weekly, challenge mission completion.

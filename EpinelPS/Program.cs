@@ -6,6 +6,7 @@ using EpinelPS.Networking;
 using EpinelPS.Services;
 using EpinelPS.Utils;
 using EpinelPS.LobbyServer.Stage;
+using EpinelPS.LobbyServer.Mission;
 using log4net.Config;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
@@ -58,6 +59,7 @@ internal class Program
                     ClearStage.EnsureDefaultCharacters(user);
                 }
                 ClearStage.ReconcileMainQuests(user, logToConsole: false);
+                MissionReconciler.ReconcileAll(user, logToConsole: false);
                 MessengerMessageCreator.CreateAllEligibleOpeners(user, logToConsole: false);
             }
 

@@ -1,6 +1,7 @@
-﻿using EpinelPS.Data;
+using EpinelPS.Data;
 using EpinelPS.Database;
 using EpinelPS.Interfaces;
+using EpinelPS.LobbyServer.Mission;
 using EpinelPS.Utils;
 using Microsoft.EntityFrameworkCore;
 using Google.Protobuf;
@@ -121,6 +122,7 @@ public class AuthController(IUserService UserService, GameContext db) : Controll
         };
 
         user.ResetDataIfNeeded();
+        MissionReconciler.ReconcileAll(user);
 
         return response;
     }
