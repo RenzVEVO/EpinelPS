@@ -68,6 +68,31 @@ public class FinishSubquest : LobbyMessage
                 user.AddTrigger(subQuestEntry.Value.ClearTrigger, subQuestEntry.Value.ClearConditionValue, subQuestEntry.Value.ClearConditionId);
             }
             user.AddTrigger(Trigger.SubQuestClear, 1, req.SubQuestId);
+
+            // Mark associated substages as completed in user.FieldInfoNew
+            if (subQuestEntry.Value.ClearTrigger == Trigger.CampaignGroupClear)
+            {
+                foreach (CampaignStageRecord stage in GameData.Instance.StageDataRecords.Values.Where(s => s.GroupId == subQuestEntry.Value.ClearConditionId))
+                {
+                    string stageMapId = GameData.Instance.GetMapIdFromChapter(stage.ChapterId, stage.ChapterMod);
+                    if (!user.FieldInfoNew.ContainsKey(stageMapId))
+                        user.FieldInfoNew.Add(stageMapId, new FieldInfoNew());
+                    if (!user.FieldInfoNew[stageMapId].CompletedStages.Contains(stage.Id))
+                        user.FieldInfoNew[stageMapId].CompletedStages.Add(stage.Id);
+                }
+            }
+            else if (subQuestEntry.Value.ClearTrigger == Trigger.CampaignClear)
+            {
+                CampaignStageRecord? stage = GameData.Instance.GetStageData(subQuestEntry.Value.ClearConditionId);
+                if (stage != null)
+                {
+                    string stageMapId = GameData.Instance.GetMapIdFromChapter(stage.ChapterId, stage.ChapterMod);
+                    if (!user.FieldInfoNew.ContainsKey(stageMapId))
+                        user.FieldInfoNew.Add(stageMapId, new FieldInfoNew());
+                    if (!user.FieldInfoNew[stageMapId].CompletedStages.Contains(stage.Id))
+                        user.FieldInfoNew[stageMapId].CompletedStages.Add(stage.Id);
+                }
+            }
         }
 
         if (rewardId != 0)

@@ -150,7 +150,8 @@ public class ClearStage : LobbyMessage
         if (!user.FieldInfoNew.ContainsKey(stageMapId))
             user.FieldInfoNew.Add(stageMapId, new FieldInfoNew());
 
-        user.FieldInfoNew[stageMapId].CompletedStages.Add(StageId);
+        if (!user.FieldInfoNew[stageMapId].CompletedStages.Contains(StageId))
+            user.FieldInfoNew[stageMapId].CompletedStages.Add(StageId);
 
         // Subquests like Tetra Connect require clearing every stage of a stage
         // group, the client waits for this trigger to play the ending scenario.
@@ -393,6 +394,41 @@ public class ClearStage : LobbyMessage
         catch (Exception ex)
         {
             Logging.Warn($"Failed to reconcile ChapterClear triggers for user {user.ID}: {ex.Message}");
+        }
+    }
+
+    public static void ReconcileSubquestStages(User user)
+    {
+        foreach (KeyValuePair<int, bool> subQuest in user.SubQuestData)
+        {
+            if (!subQuest.Value) continue;
+
+            if (GameData.Instance.Subquests.TryGetValue(subQuest.Key, out SubQuestRecord? subQuestRecord))
+            {
+                if (subQuestRecord.ClearTrigger == Trigger.CampaignGroupClear)
+                {
+                    foreach (CampaignStageRecord stage in GameData.Instance.StageDataRecords.Values.Where(s => s.GroupId == subQuestRecord.ClearConditionId))
+                    {
+                        string stageMapId = GameData.Instance.GetMapIdFromChapter(stage.ChapterId, stage.ChapterMod);
+                        if (!user.FieldInfoNew.ContainsKey(stageMapId))
+                            user.FieldInfoNew.Add(stageMapId, new FieldInfoNew());
+                        if (!user.FieldInfoNew[stageMapId].CompletedStages.Contains(stage.Id))
+                            user.FieldInfoNew[stageMapId].CompletedStages.Add(stage.Id);
+                    }
+                }
+                else if (subQuestRecord.ClearTrigger == Trigger.CampaignClear)
+                {
+                    CampaignStageRecord? stage = GameData.Instance.GetStageData(subQuestRecord.ClearConditionId);
+                    if (stage != null)
+                    {
+                        string stageMapId = GameData.Instance.GetMapIdFromChapter(stage.ChapterId, stage.ChapterMod);
+                        if (!user.FieldInfoNew.ContainsKey(stageMapId))
+                            user.FieldInfoNew.Add(stageMapId, new FieldInfoNew());
+                        if (!user.FieldInfoNew[stageMapId].CompletedStages.Contains(stage.Id))
+                            user.FieldInfoNew[stageMapId].CompletedStages.Add(stage.Id);
+                    }
+                }
+            }
         }
     }
 }
