@@ -41,8 +41,13 @@ public class ObtainAchievement : LobbyMessage
 
             user.CompletedAchievements.Add(item);
 
-            // Accumulate achievement progress points toward milestone chests
-            total_points += key.PointValue > 0 ? key.PointValue : 1;
+            // Accumulate achievement progress points toward milestone chests ("Complete XX Challenge(s)"):
+            // Each regular challenge completed awards exactly 1 point.
+            // Milestone chests themselves (PointRewardAchievement) do not recursively award milestone points.
+            if (key.Trigger != Trigger.PointRewardAchievement)
+            {
+                total_points += 1;
+            }
         }
 
         if (total_points > 0)

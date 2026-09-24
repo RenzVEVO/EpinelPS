@@ -358,6 +358,11 @@ public class ExecGacha : LobbyMessage
 
          
         user.AddGachaPullCount(bannerID, numberOfPulls);
+        if (bannerID == NEW_PLAYER_SPECIAL_BANNER_ID)
+        {
+            // Triggers the "Recruit Nikkes in New Commander Special Recruitment" challenge
+            user.AddTrigger(Trigger.FirstPaidGachaLegacy, 1);
+        }
 
         // ==========================
         // BANNER PAYBACK RECORDS
