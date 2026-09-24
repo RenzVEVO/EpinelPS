@@ -125,7 +125,7 @@ public static class MessengerMessageCreator
                 continue;
 
             // Prerequisite check: If BeforeSubQuestId > 0, it must be completed
-            if (subQuest.BeforeSubQuestId > 0)
+            if (!user.SubQuestData.ContainsKey(subQuest.Id) && subQuest.BeforeSubQuestId > 0)
             {
                 if (!user.SubQuestData.TryGetValue(subQuest.BeforeSubQuestId, out bool prevDone) || !prevDone)
                     continue;
