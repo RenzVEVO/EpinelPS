@@ -35,11 +35,12 @@ public class TriggerSync : LobbyMessage
             .Max() ?? 0;
 
         long effectiveSeq = req.Seq;
-        if (effectiveSeq > maxId)
+        if (user.NeedsTriggerSyncRestart || effectiveSeq > maxId)
         {
-            // The client's cached sequence is ahead of the database (e.g. after trigger cleanup or save restore).
+            // The client's cached sequence is ahead of the database or triggers were sanitized.
             // Request the client to restart trigger sync from 0.
-            Logging.WriteLine($"[TriggerSync] Client seq ({req.Seq}) > maxId ({maxId}) for user {user.ID}; requesting restart from 0", LogType.Info);
+            user.NeedsTriggerSyncRestart = false;
+            Logging.WriteLine($"[TriggerSync] Trigger resync needed (seq={req.Seq}, maxId={maxId}) for user {user.ID}; requesting restart from 0", LogType.Info);
             response.Restart = true;
             effectiveSeq = 0;
         }

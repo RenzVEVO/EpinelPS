@@ -177,6 +177,8 @@ public class User
     public Dictionary<int, int> GachaSelectupChoices { get; set; } = [];
 
     public bool DailyDiscountUsed { get; set; } = false;
+    [Newtonsoft.Json.JsonIgnore]
+    public bool NeedsTriggerSyncRestart { get; set; } = false;
 
     // solo raid data
     public Dictionary<int, SoloRaidInfo> SoloRaidData = []; // key: raidId
@@ -751,6 +753,11 @@ public class User
         if (bannerID == premiumbanner)
         {
             AddTrigger(Trigger.GachaPremium, pullCount);
+        }
+        else if (bannerID == 4)
+        {
+            // New Commander Special Recruitment one-time challenge
+            AddTrigger(Trigger.FirstPaidGachaLegacy, 1);
         }
 
         if (GachaBannerMaxPulls.ContainsKey(bannerID))

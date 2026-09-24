@@ -58,15 +58,27 @@ public static class MissionReconciler
                 try { ReconcileObtainCharacterNew(user, context, logToConsole); }
                 catch (Exception ex) { Logging.WriteLine($"[MissionReconciler] Step 5 ObtainCharNew failed: {ex.Message}", LogType.Debug); }
 
-                // 6. Reconcile campaign chapter clears (Normal and Hard mode)
+                // 6. Reconcile New Commander Special Recruitment challenge
+                try { ReconcileSpecialRecruitment(user, context, logToConsole); }
+                catch (Exception ex) { Logging.WriteLine($"[MissionReconciler] Step 6 SpecialRecruit failed: {ex.Message}", LogType.Debug); }
+
+                // 7. Reconcile "Complete XX Challenge(s)" milestone banner
+                try { ReconcilePointRewardAchievement(user, context, logToConsole); }
+                catch (Exception ex) { Logging.WriteLine($"[MissionReconciler] Step 7 PointRewardAchievement failed: {ex.Message}", LogType.Debug); }
+
+                // 8. Auto-complete online & PvP challenges unavailable on private server
+                try { ReconcileOnlineAndPvPFeatures(user, context, logToConsole); }
+                catch (Exception ex) { Logging.WriteLine($"[MissionReconciler] Step 8 OnlineAndPvP failed: {ex.Message}", LogType.Debug); }
+
+                // 9. Reconcile campaign chapter clears (Normal and Hard mode)
                 try { ReconcileChapterClears(user, context, logToConsole); }
-                catch (Exception ex) { Logging.WriteLine($"[MissionReconciler] Step 6 ChapterClears failed: {ex.Message}", LogType.Debug); }
+                catch (Exception ex) { Logging.WriteLine($"[MissionReconciler] Step 9 ChapterClears failed: {ex.Message}", LogType.Debug); }
 
-                // 7. Reconcile Tribe Tower floor progression
+                // 10. Reconcile Tribe Tower floor progression
                 try { ReconcileTowerClears(user, context, logToConsole); }
-                catch (Exception ex) { Logging.WriteLine($"[MissionReconciler] Step 7 TowerClears failed: {ex.Message}", LogType.Debug); }
+                catch (Exception ex) { Logging.WriteLine($"[MissionReconciler] Step 10 TowerClears failed: {ex.Message}", LogType.Debug); }
 
-                // 8. Reconcile Main Campaign Quests (when static game data is initialized)
+                // 11. Reconcile Main Campaign Quests (when static game data is initialized)
                 try
                 {
                     if (GameData.Instance != null && GameData.Instance.QuestDataRecords != null)
@@ -228,7 +240,30 @@ public static class MissionReconciler
     }
 
     /// <summary>
+    /// Reconciles the "Recruit Nikkes in New Commander Special Recruitment" challenge (Trigger: FirstPaidGachaLegacy).
+    /// </summary>
+    private static void ReconcileSpecialRecruitment(User user, GameContext context, bool logToConsole)
+    {
+        // Banner ID 4 is NEW_PLAYER_SPECIAL_BANNER_ID
+        bool hasPulledSpecial = user.GachaBannerMaxPulls.TryGetValue(4, out int pulls) && pulls > 0;
+        if (!hasPulledSpecial) return;
+
+        bool hasTrigger = context.Triggers.Any(t => t.UserId == user.ID && t.Type == Trigger.FirstPaidGachaLegacy);
+        if (!hasTrigger)
+        {
+            user.AddTrigger(Trigger.FirstPaidGachaLegacy, 1, 0, logToConsole);
+            if (logToConsole)
+            {
+                Logging.WriteLine($"[MissionReconciler] Reconciled FirstPaidGachaLegacy for user {user.ID}", LogType.Info);
+            }
+        }
+    }
+
+    /// <summary>
     /// Reconciles total count of unique NIKKEs acquired.
+    /// Ensures trigger sum strictly matches the player's unique roster count, fixing the bug
+    /// where multiple reconciliation/pull records stacked and caused the challenge to skip to "Recruit 70 Nikke(s)".
+    /// Also sanitizes any premature achievements claimed above the user's actual roster count.
     /// </summary>
     private static void ReconcileObtainCharacterNew(User user, GameContext context, bool logToConsole)
     {
@@ -248,16 +283,155 @@ public static class MissionReconciler
             uniqueCount = user.Characters.Select(c => c.Tid).Distinct().Count();
         }
 
-        if (uniqueCount < 5) return;
-
-        int existingCount = context.Triggers
+        var ocnTriggers = context.Triggers
             .Where(t => t.UserId == user.ID && t.Type == Trigger.ObtainCharacterNew)
-            .Select(t => (int?)t.Value)
-            .Max() ?? 0;
+            .ToList();
 
-        if (existingCount < uniqueCount)
+        int currentSum = ocnTriggers.Sum(t => t.Value);
+
+        if (currentSum > uniqueCount)
         {
-            user.AddTrigger(Trigger.ObtainCharacterNew, uniqueCount, 0, logToConsole);
+            // Triggers were stacked/overcounted from previous passes or pull events
+            context.Triggers.RemoveRange(ocnTriggers);
+            context.SaveChanges();
+
+            if (uniqueCount > 0)
+            {
+                user.AddTrigger(Trigger.ObtainCharacterNew, uniqueCount, 0, logToConsole);
+            }
+            user.NeedsTriggerSyncRestart = true;
+            if (logToConsole)
+            {
+                Logging.WriteLine($"[MissionReconciler] Corrected ObtainCharacterNew sum (was {currentSum}, reset to {uniqueCount}) for user {user.ID}", LogType.Info);
+            }
+        }
+        else if (currentSum < uniqueCount)
+        {
+            user.AddTrigger(Trigger.ObtainCharacterNew, uniqueCount - currentSum, 0, logToConsole);
+        }
+
+        // Sanitize any prematurely claimed ObtainCharacterNew achievements above the user's actual roster count
+        if (GameData.Instance != null && GameData.Instance.TriggerTable != null)
+        {
+            int removedCount = user.CompletedAchievements.RemoveAll(id => 
+                GameData.Instance.TriggerTable.TryGetValue(id, out var t) && 
+                t.Trigger == Trigger.ObtainCharacterNew && 
+                t.ConditionValue > uniqueCount);
+
+            if (removedCount > 0)
+            {
+                JsonDb.Save();
+                if (logToConsole)
+                {
+                    Logging.WriteLine($"[MissionReconciler] Cleaned up {removedCount} prematurely claimed recruit achievements above count {uniqueCount}", LogType.Info);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reconciles the "Complete XX Challenge(s)" milestone banner (Trigger: PointRewardAchievement).
+    /// Each completed regular challenge awards 1 milestone point.
+    /// Fixes the critical bug where PointValue (10,000+) was added to PointRewardAchievement
+    /// and emptying the banner prematurely.
+    /// </summary>
+    private static void ReconcilePointRewardAchievement(User user, GameContext context, bool logToConsole)
+    {
+        if (GameData.Instance == null || GameData.Instance.TriggerTable == null) return;
+
+        // Count how many regular (non-milestone) challenges have been completed
+        int actualCompletedChallenges = user.CompletedAchievements
+            .Count(id => GameData.Instance.TriggerTable.TryGetValue(id, out var t) && t.Trigger != Trigger.PointRewardAchievement);
+
+        var praTriggers = context.Triggers
+            .Where(t => t.UserId == user.ID && t.Type == Trigger.PointRewardAchievement)
+            .ToList();
+
+        int currentPraSum = praTriggers.Sum(t => t.Value);
+
+        if (currentPraSum > actualCompletedChallenges)
+        {
+            // Corrupted/inflated point triggers found (e.g. 105,750 from old bug)
+            context.Triggers.RemoveRange(praTriggers);
+            context.SaveChanges();
+
+            if (actualCompletedChallenges > 0)
+            {
+                user.AddTrigger(Trigger.PointRewardAchievement, actualCompletedChallenges, 0, logToConsole);
+            }
+            user.NeedsTriggerSyncRestart = true;
+            if (logToConsole)
+            {
+                Logging.WriteLine($"[MissionReconciler] Fixed corrupted PointRewardAchievement (was {currentPraSum}, reset to {actualCompletedChallenges}) for user {user.ID}", LogType.Info);
+            }
+        }
+        else if (currentPraSum < actualCompletedChallenges)
+        {
+            user.AddTrigger(Trigger.PointRewardAchievement, actualCompletedChallenges - currentPraSum, 0, logToConsole);
+        }
+
+        // Sanitize any prematurely claimed milestone chests above actual completed challenge count
+        int removedMilestones = user.CompletedAchievements.RemoveAll(id =>
+            GameData.Instance.TriggerTable.TryGetValue(id, out var t) &&
+            t.Trigger == Trigger.PointRewardAchievement &&
+            t.ConditionValue > actualCompletedChallenges);
+
+        if (removedMilestones > 0)
+        {
+            JsonDb.Save();
+            if (logToConsole)
+            {
+                Logging.WriteLine($"[MissionReconciler] Cleaned up {removedMilestones} prematurely claimed challenge milestone chests above count {actualCompletedChallenges}", LogType.Info);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Auto-completes challenge and mission achievements that depend on live networking features
+    /// not present in a local private server (Friendship points exchange, Rookie Arena wins, Champion Arena season cheering).
+    /// </summary>
+    private static void ReconcileOnlineAndPvPFeatures(User user, GameContext context, bool logToConsole)
+    {
+        // 1. Send Social Points (SendFriendShipPoint, up to max challenge tier 57,000)
+        const int maxFriendshipPoints = 57000;
+        int currentFp = context.Triggers
+            .Where(t => t.UserId == user.ID && t.Type == Trigger.SendFriendShipPoint)
+            .Sum(t => (int?)t.Value) ?? 0;
+        if (currentFp < maxFriendshipPoints)
+        {
+            user.AddTrigger(Trigger.SendFriendShipPoint, maxFriendshipPoints - currentFp, 0, logToConsole);
+            if (logToConsole) Logging.WriteLine($"[MissionReconciler] Auto-completed SendFriendShipPoint ({maxFriendshipPoints}) for user {user.ID}", LogType.Info);
+        }
+
+        // 2. Rookie Arena Wins (WinArena, up to max challenge tier 10,000)
+        const int maxArenaWins = 10000;
+        int currentWins = context.Triggers
+            .Where(t => t.UserId == user.ID && t.Type == Trigger.WinArena)
+            .Sum(t => (int?)t.Value) ?? 0;
+        if (currentWins < maxArenaWins)
+        {
+            user.AddTrigger(Trigger.WinArena, maxArenaWins - currentWins, 0, logToConsole);
+            if (logToConsole) Logging.WriteLine($"[MissionReconciler] Auto-completed WinArena ({maxArenaWins}) for user {user.ID}", LogType.Info);
+        }
+
+        // 3. Rookie Arena Play Count (Daily/Weekly missions: 2 and 10 plays)
+        const int maxArenaPlays = 10;
+        int currentPlays = context.Triggers
+            .Where(t => t.UserId == user.ID && t.Type == Trigger.RookieArenaPlayCount)
+            .Sum(t => (int?)t.Value) ?? 0;
+        if (currentPlays < maxArenaPlays)
+        {
+            user.AddTrigger(Trigger.RookieArenaPlayCount, maxArenaPlays - currentPlays, 0, logToConsole);
+        }
+
+        // 4. Champion Arena season cheering achievements (Win and Lose all gambles in one season)
+        if (!context.Triggers.Any(t => t.UserId == user.ID && t.Type == Trigger.ChampionArenaGambleWinAll))
+        {
+            user.AddTrigger(Trigger.ChampionArenaGambleWinAll, 1, 0, logToConsole);
+        }
+        if (!context.Triggers.Any(t => t.UserId == user.ID && t.Type == Trigger.ChampionArenaGambleLoseAll))
+        {
+            user.AddTrigger(Trigger.ChampionArenaGambleLoseAll, 1, 0, logToConsole);
         }
     }
 
