@@ -59,6 +59,7 @@ internal class Program
                     ClearStage.EnsureDefaultCharacters(user);
                 }
                 ClearStage.ReconcileMainQuests(user, logToConsole: false);
+                ClearStage.ReconcileSubquestStages(user);
                 MissionReconciler.ReconcileAll(user, logToConsole: false);
                 MessengerMessageCreator.CreateAllEligibleOpeners(user, logToConsole: false);
             }
