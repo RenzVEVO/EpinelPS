@@ -23,22 +23,26 @@ public class SyncBadge : LobbyMessage
         bool hasUnclaimedMail = user.MailDatas.Values.Any(m => m.State == 1 && m.HasReward);
         if (hasUnclaimedMail)
         {
-            var existingMailboxBadge = user.Badges.FirstOrDefault(b => b.BadgeContent == BadgeContents.Mailbox);
-            if (existingMailboxBadge == null)
+            // CRITICAL: The official client only displays the red dot if the badge sequence
+            // is strictly greater than req.LastBadgeSeq. If the sequence is <= req.LastBadgeSeq,
+            // the client ignores it as already seen/acknowledged.
+            // By always ensuring a fresh sequence > req.LastBadgeSeq, the red dot is guaranteed
+            // to show on every sync as long as rewards remain unclaimed.
+            long freshSeq = Math.Max(user.LastBadgeSeq, req.LastBadgeSeq) + 1;
+            user.LastBadgeSeq = freshSeq;
+
+            user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.Mailbox);
+            user.Badges.Add(new BadgeModel
             {
-                user.LastBadgeSeq++;
-                existingMailboxBadge = new BadgeModel
-                {
-                    BadgeContent = BadgeContents.Mailbox,
-                    BadgeGuid = Guid.NewGuid().ToString(),
-                    Location = string.Empty,
-                    Seq = user.LastBadgeSeq
-                };
-                user.Badges.Add(existingMailboxBadge);
-            }
+                BadgeContent = BadgeContents.Mailbox,
+                BadgeGuid = Guid.NewGuid().ToString(),
+                Location = string.Empty,
+                Seq = freshSeq
+            });
         }
         else
         {
+            // No unclaimed rewards remain -> extinguish the Mailbox red dot badge
             user.Badges.RemoveAll(b => b.BadgeContent == BadgeContents.Mailbox || b.BadgeContent == BadgeContents.MailboxMessage);
         }
 
