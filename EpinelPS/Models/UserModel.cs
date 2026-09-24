@@ -96,6 +96,14 @@ public class User
     public int InfraCoreLvl { get; set; } = 1;
     public Dictionary<int, bool> InfraCoreRewardReceived { get; set; } = [];
     public UserPointData userPointData { get; set; } = new();
+    public int UserLevel
+    {
+        get => userPointData?.UserLevel ?? 1;
+        set
+        {
+            if (userPointData != null) userPointData.UserLevel = value;
+        }
+    }
     public Dictionary<int, DateTime> MonthlySubscriptions { get; set; } = [];
     public Dictionary<int, DateTime> MonthlySubscriptionLastClaimed { get; set; } = [];
     public Dictionary<int, int> MonthlySubscriptionRemainingClaims { get; set; } = [];
@@ -451,7 +459,7 @@ public class User
         }
         return characterLevel;
     }
-    internal int GetSynchroLevel()
+    public int GetSynchroLevel()
     {
         if (SynchroDeviceUpgraded)
             return SynchroDeviceLevel;
@@ -466,6 +474,21 @@ public class User
         {
             return 1;
         }
+    }
+
+    /// <summary>
+    /// Returns the maximum character level across all owned NIKKEs and Synchro device.
+    /// Used for level-based achievements and mission milestones.
+    /// </summary>
+    public int GetMaxCharacterLevel()
+    {
+        int maxLevel = 1;
+        if (Characters.Count > 0)
+        {
+            maxLevel = Math.Max(maxLevel, Characters.Max(c => c.Level));
+        }
+        maxLevel = Math.Max(maxLevel, GetSynchroLevel());
+        return maxLevel;
     }
 
     internal int GetMaxAttractiveLevel(int nameCode)
@@ -612,17 +635,17 @@ public class User
     public void ResetDataIfNeeded()
     {
         bool needsSave = false;
-        if (InfraCoreExp > 0)
+        var infracore = GameData.Instance?.GetInfracoreGrade(InfraCoreLvl);
+        if (GameData.Instance != null && InfraCoreExp > 0)
         {
             int correctLvl = GameData.Instance.GetInfraCoreLev(InfraCoreExp);
             if (InfraCoreLvl < correctLvl)
             {
                 InfraCoreLvl = correctLvl;
+                infracore = GameData.Instance.GetInfracoreGrade(InfraCoreLvl);
                 needsSave = true;
             }
         }
-
-        var infracore = GameData.Instance.GetInfracoreGrade(InfraCoreLvl);
 
 
         // Check weekly reset
@@ -631,18 +654,15 @@ public class User
             Logging.WriteLine("Resetting weekly user data...", LogType.Warning);
 
             LastWeeklyReset = DateTime.UtcNow;
-            var currentSeasonData = ResetableData.SimRoomData.CurrentSeasonData;
-            currentSeasonData.LatestOption = new();
-            ResetableData = new()
+
+            // Reset weekly mission points and completed weekly missions list for a fresh week
+            WeeklyResetableData = new();
+
+            // Refresh Simulation Room seasonal options while preserving current difficulty and chapter
+            if (ResetableData?.SimRoomData?.CurrentSeasonData != null)
             {
-                SimRoomData = new()
-                {
-                    // Retain old LegacyBuffs data and currentSeason data
-                    CurrentDifficulty = ResetableData.SimRoomData.CurrentDifficulty,
-                    CurrentChapter = ResetableData.SimRoomData.CurrentChapter,
-                    CurrentSeasonData = currentSeasonData,
-                }
-            };
+                ResetableData.SimRoomData.CurrentSeasonData.LatestOption = new();
+            }
 
             // Weekly stamina reset: base 2 + InfraCore bonus (FL[4] = StaminaMaxCount)
             if (infracore != null)
@@ -669,8 +689,8 @@ public class User
             };
 
             DispatchResetCount = 0;
-            ResetableData.DispatchCount = GetDispatchCount() + infracore.FunctionList[1].Function;
-            ResetableData.DailyCounselCount[1] = 3 + infracore.FunctionList[2].Function;
+            ResetableData.DispatchCount = GetDispatchCount() + (infracore != null ? infracore.FunctionList[1].Function : 0);
+            ResetableData.DailyCounselCount[1] = 3 + (infracore != null ? infracore.FunctionList[2].Function : 0);
             GachaDailyFreePulls.Clear();
             DailyDiscountUsed = false;
 
