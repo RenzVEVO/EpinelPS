@@ -137,7 +137,8 @@ public static class MessengerMessageCreator
                 continue;
 
             // Condition triggers check (e.g. CampaignClear of required stage)
-            if (!MessengerTriggerUtils.IsTriggerListSatisfied(user, subQuest.TriggerList))
+            // If already enrolled in SubQuestData, proceed to create opener dialog
+            if (!user.SubQuestData.ContainsKey(subQuest.Id) && !MessengerTriggerUtils.IsTriggerListSatisfied(user, subQuest.TriggerList))
                 continue;
 
             KeyValuePair<string, MessengerDialogRecord> opener = GameData.Instance.Messages.FirstOrDefault(item =>
