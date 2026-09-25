@@ -399,36 +399,34 @@ public class ClearStage : LobbyMessage
 
     public static void ReconcileSubquestStages(User user)
     {
-        foreach (KeyValuePair<int, bool> subQuest in user.SubQuestData)
+        try
         {
-            if (!subQuest.Value) continue;
-
-            if (GameData.Instance.Subquests.TryGetValue(subQuest.Key, out SubQuestRecord? subQuestRecord))
+            foreach (KeyValuePair<int, bool> subQuest in user.SubQuestData)
             {
-                if (subQuestRecord.ClearTrigger == Trigger.CampaignGroupClear)
+                if (!subQuest.Value) continue;
+
+                if (GameData.Instance.Subquests.TryGetValue(subQuest.Key, out SubQuestRecord? subQuestRecord))
                 {
-                    foreach (CampaignStageRecord stage in GameData.Instance.StageDataRecords.Values.Where(s => s.GroupId == subQuestRecord.ClearConditionId))
+                    int condId = subQuestRecord.ClearConditionId;
+                    if (condId <= 0) continue;
+
+                    foreach (CampaignStageRecord stage in GameData.Instance.StageDataRecords.Values)
                     {
-                        string stageMapId = GameData.Instance.GetMapIdFromChapter(stage.ChapterId, stage.ChapterMod);
-                        if (!user.FieldInfoNew.ContainsKey(stageMapId))
-                            user.FieldInfoNew.Add(stageMapId, new FieldInfoNew());
-                        if (!user.FieldInfoNew[stageMapId].CompletedStages.Contains(stage.Id))
-                            user.FieldInfoNew[stageMapId].CompletedStages.Add(stage.Id);
-                    }
-                }
-                else if (subQuestRecord.ClearTrigger == Trigger.CampaignClear)
-                {
-                    CampaignStageRecord? stage = GameData.Instance.GetStageData(subQuestRecord.ClearConditionId);
-                    if (stage != null)
-                    {
-                        string stageMapId = GameData.Instance.GetMapIdFromChapter(stage.ChapterId, stage.ChapterMod);
-                        if (!user.FieldInfoNew.ContainsKey(stageMapId))
-                            user.FieldInfoNew.Add(stageMapId, new FieldInfoNew());
-                        if (!user.FieldInfoNew[stageMapId].CompletedStages.Contains(stage.Id))
-                            user.FieldInfoNew[stageMapId].CompletedStages.Add(stage.Id);
+                        if ((stage.GroupId != 0 && stage.GroupId == condId) || stage.Id == condId)
+                        {
+                            string stageMapId = GameData.Instance.GetMapIdFromChapter(stage.ChapterId, stage.ChapterMod);
+                            if (!user.FieldInfoNew.ContainsKey(stageMapId))
+                                user.FieldInfoNew.Add(stageMapId, new FieldInfoNew());
+                            if (!user.FieldInfoNew[stageMapId].CompletedStages.Contains(stage.Id))
+                                user.FieldInfoNew[stageMapId].CompletedStages.Add(stage.Id);
+                        }
                     }
                 }
             }
+        }
+        catch (Exception ex)
+        {
+            Logging.Warn($"Failed to reconcile subquest stages for user {user.ID}: {ex.Message}");
         }
     }
 }

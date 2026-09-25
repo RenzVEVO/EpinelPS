@@ -23,30 +23,30 @@ public class CheckCleared : LobbyMessage
             }
         }
 
-        // Also check if any requested stages belong to completed subquests
+        // Also check if any requested stages belong to completed subquests across all trigger types
         foreach (KeyValuePair<int, bool> subQuest in user.SubQuestData)
         {
             if (!subQuest.Value) continue;
 
             if (GameData.Instance.Subquests.TryGetValue(subQuest.Key, out SubQuestRecord? subQuestRecord))
             {
-                if (subQuestRecord.ClearTrigger == Trigger.CampaignGroupClear)
+                int condId = subQuestRecord.ClearConditionId;
+                if (condId <= 0) continue;
+
+                foreach (int stageId in req.StageIds)
                 {
-                    foreach (int stageId in req.StageIds)
+                    if (clearedStageIds.Contains(stageId)) continue;
+
+                    if (stageId == condId)
                     {
-                        if (clearedStageIds.Contains(stageId)) continue;
-                        CampaignStageRecord? stageData = GameData.Instance.GetStageData(stageId);
-                        if (stageData != null && stageData.GroupId == subQuestRecord.ClearConditionId)
-                        {
-                            clearedStageIds.Add(stageId);
-                        }
+                        clearedStageIds.Add(stageId);
+                        continue;
                     }
-                }
-                else if (subQuestRecord.ClearTrigger == Trigger.CampaignClear)
-                {
-                    if (req.StageIds.Contains(subQuestRecord.ClearConditionId))
+
+                    CampaignStageRecord? stageData = GameData.Instance.GetStageData(stageId);
+                    if (stageData != null && stageData.GroupId != 0 && stageData.GroupId == condId)
                     {
-                        clearedStageIds.Add(subQuestRecord.ClearConditionId);
+                        clearedStageIds.Add(stageId);
                     }
                 }
             }
