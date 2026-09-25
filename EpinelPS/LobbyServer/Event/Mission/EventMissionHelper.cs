@@ -20,8 +20,8 @@ public static class EventMissionHelper
         if (!user.EventMissionInfo.TryGetValue(eventId, out var userEvent)) return clearData;
         log.Debug($"GetClear UserEvent: {JsonConvert.SerializeObject(userEvent)}");
         int dateDay = user.GetDateDay();
-        // Check if it's a new day, reset daily missions
-        if (userEvent.LastDay != dateDay)
+        // Check if it's a new day, reset daily missions (skip permanent beginner events like Day by Day and Alice's Diary)
+        if (userEvent.LastDay != dateDay && !IsBeginnerDailyEvent(eventId))
         {
             ResetUserDailyMission(user, eventId, dateDay);
         }
@@ -161,11 +161,23 @@ public static class EventMissionHelper
 
     private static void ResetUserDailyMission(User user, int eventId, int dateDay)
     {
+        if (IsBeginnerDailyEvent(eventId)) return;
         if (!user.EventMissionInfo.TryGetValue(eventId, out var userEvent)) return;
         if (userEvent.LastDay == dateDay) return;
         user.EventMissionInfo[eventId].DailyMissionIdList = [];
         user.EventMissionInfo[eventId].LastDay = dateDay;
         JsonDb.Save();
+    }
+
+    /// <summary>
+    /// Determines whether the specified event is a permanent beginner daily event (e.g. Day by Day or Alice's Diary).
+    /// These events do not wipe missions across calendar days.
+    /// </summary>
+    public static bool IsBeginnerDailyEvent(int eventId)
+    {
+        return eventId == 20001 || eventId == 20002 ||
+               (GameData.Instance?.DailyMissionEventSettingTable != null &&
+                GameData.Instance.DailyMissionEventSettingTable.Values.Any(de => de.EventId == eventId));
     }
 
     /// <summary>
