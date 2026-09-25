@@ -90,6 +90,10 @@ public static class MissionReconciler
                 {
                     Logging.WriteLine($"[MissionReconciler] Main quest reconciliation skipped: {qEx.Message}", LogType.Debug);
                 }
+
+                // 12. Reconcile beginner daily event progression (Day by Day, Alice's Diary)
+                try { ReconcileDailyEventMissions(user, context, logToConsole); }
+                catch (Exception ex) { Logging.WriteLine($"[MissionReconciler] Step 12 DailyEventMissions failed: {ex.Message}", LogType.Debug); }
             }
             catch (Exception ex)
             {
@@ -414,8 +418,8 @@ public static class MissionReconciler
             if (logToConsole) Logging.WriteLine($"[MissionReconciler] Auto-completed WinArena ({maxArenaWins}) for user {user.ID}", LogType.Info);
         }
 
-        // 3. Rookie Arena Play Count (Daily/Weekly missions: 2 and 10 plays)
-        const int maxArenaPlays = 10;
+        // 3. Rookie Arena Play Count (Daily/Weekly missions: 2 and 10 plays; Alice's Diary: up to 25 plays)
+        const int maxArenaPlays = 25;
         int currentPlays = context.Triggers
             .Where(t => t.UserId == user.ID && t.Type == Trigger.RookieArenaPlayCount)
             .Sum(t => (int?)t.Value) ?? 0;
@@ -432,6 +436,81 @@ public static class MissionReconciler
         if (!context.Triggers.Any(t => t.UserId == user.ID && t.Type == Trigger.ChampionArenaGambleLoseAll))
         {
             user.AddTrigger(Trigger.ChampionArenaGambleLoseAll, 1, 0, logToConsole);
+        }
+
+        // 5. Tactics Academy 9-4 completion for Alice's Diary Day 1
+        if (user.CompletedTacticAcademyLessons.Contains(9004))
+        {
+            if (!context.Triggers.Any(t => t.UserId == user.ID && t.Type == Trigger.TacticAcademyFinish94))
+            {
+                user.AddTrigger(Trigger.TacticAcademyFinish94, 1, 0, logToConsole);
+                if (logToConsole) Logging.WriteLine($"[MissionReconciler] Reconciled TacticAcademyFinish94 for user {user.ID}", LogType.Info);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reconciles trigger progress for beginner daily events (Day by Day and Alice's Diary).
+    /// Ensures that Trigger.EventPoint (advancing the 0/45 and 0/70 progress bar) and
+    /// Trigger.DailyEventClear (advancing Day 1..14 main mission completion) stay strictly
+    /// consistent with the user's claimed mission records.
+    /// </summary>
+    private static void ReconcileDailyEventMissions(User user, GameContext context, bool logToConsole)
+    {
+        if (GameData.Instance == null || GameData.Instance.DailyEventTable == null) return;
+        if (user.EventMissionInfo == null || user.EventMissionInfo.Count == 0) return;
+
+        foreach (var (eventId, userEvent) in user.EventMissionInfo)
+        {
+            if (userEvent.MissionIdList == null || userEvent.MissionIdList.Count == 0) continue;
+
+            // Only process beginner daily events (e.g. 20001, 20002)
+            if (eventId != 20001 && eventId != 20002) continue;
+
+            int expectedEventPoints = 0;
+            Dictionary<int, int> expectedGroupClears = [];
+
+            foreach (var claimedId in userEvent.MissionIdList)
+            {
+                if (GameData.Instance.DailyEventTable.TryGetValue(claimedId, out var dailyRecord))
+                {
+                    if (!dailyRecord.IsMain)
+                    {
+                        expectedEventPoints += dailyRecord.PointValue > 0 ? dailyRecord.PointValue : 1;
+                        if (dailyRecord.EventPhaseGroupId > 0)
+                        {
+                            expectedGroupClears[dailyRecord.EventPhaseGroupId] = expectedGroupClears.GetValueOrDefault(dailyRecord.EventPhaseGroupId, 0) + 1;
+                        }
+                    }
+                }
+            }
+
+            // Check Trigger.EventPoint for this event
+            int currentEventPoints = context.Triggers
+                .Where(t => t.UserId == user.ID && t.Type == Trigger.EventPoint && t.ConditionId == eventId)
+                .Sum(t => (int?)t.Value) ?? 0;
+
+            if (currentEventPoints < expectedEventPoints)
+            {
+                user.AddTrigger(Trigger.EventPoint, expectedEventPoints - currentEventPoints, eventId, logToConsole);
+                if (logToConsole)
+                {
+                    Logging.WriteLine($"[MissionReconciler] Reconciled EventPoint for event {eventId} (was {currentEventPoints}, added {expectedEventPoints - currentEventPoints}) for user {user.ID}", LogType.Info);
+                }
+            }
+
+            // Check Trigger.DailyEventClear for each phase group
+            foreach (var (groupId, expectedClears) in expectedGroupClears)
+            {
+                int currentClears = context.Triggers
+                    .Where(t => t.UserId == user.ID && t.Type == Trigger.DailyEventClear && t.ConditionId == groupId)
+                    .Sum(t => (int?)t.Value) ?? 0;
+
+                if (currentClears < expectedClears)
+                {
+                    user.AddTrigger(Trigger.DailyEventClear, expectedClears - currentClears, groupId, logToConsole);
+                }
+            }
         }
     }
 
