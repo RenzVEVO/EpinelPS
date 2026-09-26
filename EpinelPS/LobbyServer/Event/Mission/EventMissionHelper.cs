@@ -26,17 +26,11 @@ public static class EventMissionHelper
             ResetUserDailyMission(user, eventId, dateDay);
         }
 
-        foreach (var id in userEvent.DailyMissionIdList)
-        {
-            clearData.Add(new NetEventMissionClearData()
-            {
-                EventId = eventId,
-                EventMissionId = id,
-                CreatedAt = userEvent.LastDate
-            });
-        }
+        var allIds = (userEvent.MissionIdList ?? [])
+            .Concat(userEvent.DailyMissionIdList ?? [])
+            .Distinct();
 
-        foreach (var id in userEvent.MissionIdList)
+        foreach (var id in allIds)
         {
             clearData.Add(new NetEventMissionClearData()
             {
@@ -59,8 +53,8 @@ public static class EventMissionHelper
                 EventId = eventId
             };
             clearData.EventMissionClearList.AddRange(GetCleared(user, eventId));
+            clearDatas.Add(clearData);
         }
-
         return clearDatas;
     }
 

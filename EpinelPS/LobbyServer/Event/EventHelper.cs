@@ -297,7 +297,7 @@ public class EventHelper
                 response.EventWithJoinData.Add(new NetEventWithJoinData()
                 {
                     EventData = eventData,
-                    JoinAt = 0
+                    JoinAt = eventData.EventStartDate
                 });
             }
             else
@@ -328,8 +328,8 @@ public class EventHelper
             {
                 Id = dailyEvent.Id,
                 EventSystemType = (int)dailyEvent.EventSystemType,
-                EventStartDate = DateTime.UtcNow.Ticks,
-                EventVisibleDate = DateTime.UtcNow.Ticks,
+                EventStartDate = DateTime.UtcNow.AddDays(-21).Ticks,
+                EventVisibleDate = DateTime.UtcNow.AddDays(-21).Ticks,
                 EventDisableDate = DateTime.UtcNow.AddDays(30).Ticks,
                 EventEndDate = DateTime.UtcNow.AddDays(30).Ticks
             });
