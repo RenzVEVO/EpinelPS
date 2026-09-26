@@ -207,15 +207,16 @@ public static class CutsceneOptimizer
 
             Logging.WriteLine($"[CutsceneOptimizer] Optimizing cutscene {Path.GetFileName(videoPath)} to H.264 Baseline / BT.709...", LogType.Info);
 
-            // FFmpeg arguments for maximum Unity WindowsVideoMedia compatibility:
-            // -c:v libx264 -profile:v baseline -level 3.1: Strict H.264 Baseline profile
+            // FFmpeg arguments for maximum Unity WindowsVideoMedia compatibility & visual fidelity:
+            // -c:v libx264 -profile:v baseline -level 4.1: Native 1080p H.264 Baseline profile
             // -pix_fmt yuv420p: Standard 8-bit YUV 4:2:0
             // -color_primaries bt709 -color_trc bt709 -colorspace bt709: Eliminates "Color Standard: 0" fallback
+            // -x264-params colorprim=bt709:transfer=bt709:colormatrix=bt709: Encodes standard BT.709 VUI parameters
             // -fps_mode cfr -r 30: Constant frame rate to eliminate timestamp skew warnings
-            // -crf 20 -preset fast: Visually transparent compression
-            // -c:a aac -b:a 192k -ar 48000: Standard 48kHz AAC stereo audio
+            // -crf 16 -preset slow: Visually lossless compression (~7.5 Mbps for 1080p) preserving high-frequency anime line art
+            // -c:a aac -b:a 192k -ar 48000: High fidelity 48kHz AAC stereo audio
             // -movflags +faststart: Relocate moov atom to start of file for smooth HTTP range-streaming
-            string arguments = $"-y -i \"{videoPath}\" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -color_primaries bt709 -color_trc bt709 -colorspace bt709 -x264-params colorprim=bt709:transfer=bt709:colormatrix=bt709 -fps_mode cfr -r 30 -crf 20 -preset fast -c:a aac -b:a 192k -ar 48000 -movflags +faststart \"{tempPath}\"";
+            string arguments = $"-y -i \"{videoPath}\" -c:v libx264 -profile:v baseline -level 4.1 -pix_fmt yuv420p -color_primaries bt709 -color_trc bt709 -colorspace bt709 -x264-params colorprim=bt709:transfer=bt709:colormatrix=bt709 -fps_mode cfr -r 30 -crf 16 -preset slow -c:a aac -b:a 192k -ar 48000 -movflags +faststart \"{tempPath}\"";
 
             using Process process = new();
             process.StartInfo = new ProcessStartInfo
