@@ -32,6 +32,11 @@ public class GameConfigRoot
     /// Fixed Solo Raid ID when SoloRaidMode is "Fixed".
     /// </summary>
     public int SoloRaidFixedId { get; set; } = 0;
+    /// <summary>
+    /// Optional custom path to ffmpeg executable for cutscene video optimization.
+    /// If null or empty, automatically resolves from system PATH, WinGet packages, or local tools/ directory.
+    /// </summary>
+    public string? FfmpegPath { get; set; }
 }
 
 public class StaticData

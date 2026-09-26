@@ -87,9 +87,11 @@ public class AssetDownloadUtil
         if (targetFile != null)
         {
             string? contentType = null;
-            if (targetFile.EndsWith("mp4"))
+            if (targetFile.EndsWith("mp4", StringComparison.OrdinalIgnoreCase))
+            {
                 contentType = "video/mp4";
-
+                targetFile = await CutsceneOptimizer.OptimizeVideoAsync(targetFile, context.RequestAborted);
+            }
             await Results.Stream(new FileStream(targetFile, FileMode.Open, FileAccess.Read, FileShare.Read), contentType: contentType, enableRangeProcessing: true).ExecuteAsync(context);
         }
         else
