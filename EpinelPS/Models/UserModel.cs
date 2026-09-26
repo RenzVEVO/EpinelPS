@@ -242,7 +242,7 @@ public class User
         {
             Type = type,
             ConditionId = conditionId,
-            CreatedAt = DateTime.UtcNow.AddHours(9).Ticks,
+            CreatedAt = DateTime.UtcNow.Ticks,
             Value = value
         };
 
@@ -577,7 +577,7 @@ public class User
     {
         var nowLocal = DateTime.UtcNow;
 
-        // Compute the last reset threshold (most recent 2 PM before or at nowLocal)
+        // Compute the last reset threshold (most recent reset hour before or at nowLocal)
         DateTime todayResetTime = new(
             nowLocal.Year,
             nowLocal.Month,
@@ -590,7 +590,7 @@ public class User
             todayResetTime = todayResetTime.AddDays(-1);
         }
 
-        // If user's last reset was before the last scheduled 2 PM, they need reset
+        // If user's last reset was before the last scheduled reset hour, they need reset
         return LastReset < todayResetTime;
     }
 
@@ -598,18 +598,18 @@ public class User
     {
         var nowLocal = DateTime.UtcNow;
 
-        // Calculate the most recent Tuesday reset time
+        // Calculate the most recent Sunday reset time (matches official NIKKE weekly reset: Monday 05:00:00 KST / Sunday 20:00:00 UTC)
         DayOfWeek currentDay = nowLocal.DayOfWeek;
-        int daysSinceTuesday = ((int)currentDay - (int)DayOfWeek.Tuesday + 7) % 7;
+        int daysSinceSunday = ((int)currentDay - (int)DayOfWeek.Sunday + 7) % 7;
 
-        // Get the date of the most recent Tuesday
-        DateTime thisTuesday = nowLocal.Date.AddDays(-daysSinceTuesday);
+        // Get the date of the most recent Sunday
+        DateTime thisSunday = nowLocal.Date.AddDays(-daysSinceSunday);
 
         // Compute the weekly reset time
         DateTime weeklyResetTime = new(
-            thisTuesday.Year,
-            thisTuesday.Month,
-            thisTuesday.Day,
+            thisSunday.Year,
+            thisSunday.Month,
+            thisSunday.Day,
             JsonDb.Instance.ResetHourUtcTime, 0, 0
         );
 
@@ -619,7 +619,7 @@ public class User
             weeklyResetTime = weeklyResetTime.AddDays(-7);
         }
 
-        // If user's last reset was before the last scheduled 2 PM, they need reset
+        // If user's last reset was before the last scheduled reset, they need reset
         return LastWeeklyReset < weeklyResetTime;
     }
 

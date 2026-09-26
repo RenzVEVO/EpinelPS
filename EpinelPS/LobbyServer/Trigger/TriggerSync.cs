@@ -29,6 +29,23 @@ public class TriggerSync : LobbyMessage
         ResSyncTrigger response = new();
         Logging.WriteLine($"[TriggerSync] User {user.ID} requested trigger sync from seq {req.Seq}", LogType.Debug);
 
+        // Auto-heal legacy triggers stamped with future timestamps (e.g. from previous AddHours(9) bug)
+        long nowTicks = DateTime.UtcNow.Ticks;
+        var futureTriggers = GameContext.Triggers
+            .Where(x => x.UserId == user.ID && x.CreatedAt > nowTicks)
+            .ToList();
+
+        if (futureTriggers.Count > 0)
+        {
+            foreach (var ft in futureTriggers)
+            {
+                ft.CreatedAt = Math.Min(nowTicks, ft.CreatedAt - TimeSpan.FromHours(9).Ticks);
+            }
+            GameContext.SaveChanges();
+            user.NeedsTriggerSyncRestart = true;
+            Logging.WriteLine($"[TriggerSync] Corrected {futureTriggers.Count} future-dated trigger timestamps for user {user.ID}", LogType.Info);
+        }
+
         long maxId = GameContext.Triggers
             .Where(x => x.UserId == user.ID)
             .Select(x => (long?)x.Id)
