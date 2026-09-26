@@ -881,7 +881,7 @@ public class GameData
     public static async Task Load()
     {
         string? targetFile2 = await AssetDownloadUtil.DownloadOrGetFileAsync(GameConfig.Root.StaticDataMpk.Url, CancellationToken.None) ?? throw new Exception("static data download fail");
-        StaticDataPatcher.TryPatch(targetFile2, GameConfig.Root.StaticDataMpk);
+        await StaticDataPatcher.TryPatchAsync(targetFile2, GameConfig.Root.StaticDataMpk);
         _instance = new(targetFile2);
     }
     #endregion
