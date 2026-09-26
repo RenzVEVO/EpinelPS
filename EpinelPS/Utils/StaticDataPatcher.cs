@@ -1,8 +1,8 @@
-using System.Buffers.Binary;
 using System.IO.Compression;
+using System.Net;
 using System.Security.Cryptography;
-using System.Text;
 using EpinelPS.Data;
+using MemoryPack;
 using Newtonsoft.Json;
 
 namespace EpinelPS.Utils;
@@ -14,14 +14,41 @@ public static class StaticDataPatcher
         public byte[] SmallNumber { get; set; } = [];
     }
 
+    private static readonly HttpClient ProbeClient = new(new HttpClientHandler
+    {
+        AutomaticDecompression = DecompressionMethods.All
+    })
+    {
+        Timeout = TimeSpan.FromSeconds(3)
+    };
+
+    private static readonly string[] KnownLanguageTags =
+    [
+        "_en", "_ja", "_ko", "_zh-tw", "_zh-cn", "_de", "_th", "_fr"
+    ];
+
+    private static readonly string[] SupportedLanguages =
+    [
+        "en", "ja", "ko", "zh-TW", "zh-CN", "de", "th", "fr"
+    ];
+
     /// <summary>
-    /// Checks if StaticData.pack contains unlocalized video cutscene links
-    /// and patches ScenarioMovieTable.mpk to point to working localized CDN videos.
+    /// Hybrid Fast-Path Auto-Detection:
+    /// Scans ScenarioMovieTable.mpk for unlocalized video cutscene links, probes the official CDN
+    /// for 404s with localized sibling matches, and dynamically patches the table.
+    /// Fast-path marker (.patched) ensures 0 ms overhead on all subsequent server boots.
     /// </summary>
-    public static bool TryPatch(string packPath, StaticData data)
+    public static async Task<bool> TryPatchAsync(string packPath, StaticData data)
     {
         if (!File.Exists(packPath))
         {
+            return false;
+        }
+
+        string markerPath = packPath + ".patched";
+        if (File.Exists(markerPath))
+        {
+            // Fast-path: already processed and verified, 0 ms overhead
             return false;
         }
 
@@ -103,10 +130,8 @@ public static class StaticDataPatcher
                 innerZipBytes = innerZipOutMs.ToArray();
             }
 
-            // Step 4: Check if ScenarioMovieTable.mpk needs patching
-            byte[] oldLink = MakeMemoryPackString("https://cloud.nikke-kr.com/media/coinrushshowdown/coinrushshowdown.mp4");
-            bool needsPatch = false;
-
+            // Step 4: Extract ScenarioMovieTable.mpk and deserialize records
+            ScenarioMovieRecord[]? movieRecords = null;
             using (MemoryStream innerZipMs = new(innerZipBytes))
             using (ZipArchive innerZip = new(innerZipMs, ZipArchiveMode.Read))
             {
@@ -118,22 +143,36 @@ public static class StaticDataPatcher
 
                 using MemoryStream movieMs = new();
                 using (Stream s = movieEntry.Open()) s.CopyTo(movieMs);
-                byte[] movieBytes = movieMs.ToArray();
-
-                if (IndexOf(movieBytes, oldLink) != -1)
-                {
-                    needsPatch = true;
-                }
+                movieRecords = MemoryPackSerializer.Deserialize<ScenarioMovieRecord[]>(movieMs.ToArray());
             }
 
-            if (!needsPatch)
+            if (movieRecords == null || movieRecords.Length == 0)
             {
                 return false;
             }
 
-            Logging.WriteLine("[StaticDataPatcher] Unlocalized coinrushshowdown cutscene URLs detected in StaticData.pack. Applying fix...", LogType.Info);
+            // Step 5: Extract unlocalized candidate URLs (e.g. without _en, _ja, _ko tags)
+            List<string> candidateUrls = ExtractUnlocalizedUrls(movieRecords);
+            if (candidateUrls.Count == 0)
+            {
+                await File.WriteAllTextAsync(markerPath, "ok");
+                return false;
+            }
 
-            // Step 5: Repack inner zip with patched ScenarioMovieTable.mpk
+            // Step 6: Parallel probe candidate URLs via HTTP HEAD to detect 404s with localized CDN siblings
+            Dictionary<string, Dictionary<string, string>> defectiveMap = await DetectDefectiveUrlsAsync(candidateUrls);
+            if (defectiveMap.Count == 0)
+            {
+                await File.WriteAllTextAsync(markerPath, "ok");
+                return false;
+            }
+
+            Logging.WriteLine($"[StaticDataPatcher] Detected {defectiveMap.Count} defective cutscene URL(s) in StaticData.pack. Applying HFP dynamic localization...", LogType.Info);
+
+            // Step 7: Apply localized URLs to ScenarioMovieRecord array and serialize back
+            byte[] patchedMovieBytes = PatchScenarioMovieTable(movieRecords, defectiveMap);
+
+            // Step 8: Repack inner zip with updated ScenarioMovieTable.mpk
             byte[] newInnerZipBytes;
             using (MemoryStream innerZipMs = new(innerZipBytes))
             using (ZipArchive innerZip = new(innerZipMs, ZipArchiveMode.Read))
@@ -149,10 +188,7 @@ public static class StaticDataPatcher
 
                         if (entry.FullName == "ScenarioMovieTable.mpk")
                         {
-                            using MemoryStream movieMs = new();
-                            src.CopyTo(movieMs);
-                            byte[] patchedMovie = PatchScenarioMovieTable(movieMs.ToArray(), oldLink);
-                            dst.Write(patchedMovie, 0, patchedMovie.Length);
+                            dst.Write(patchedMovieBytes, 0, patchedMovieBytes.Length);
                         }
                         else
                         {
@@ -163,7 +199,7 @@ public static class StaticDataPatcher
                 newInnerZipBytes = newInnerMs.ToArray();
             }
 
-            // Step 6: Encrypt inner zip with AES-CTR
+            // Step 9: Encrypt inner zip with AES-CTR
             byte[] newEncryptedData;
             using (MemoryStream newInnerStream = new(newInnerZipBytes))
             using (MemoryStream encryptedDataMs = new())
@@ -172,7 +208,7 @@ public static class StaticDataPatcher
                 newEncryptedData = encryptedDataMs.ToArray();
             }
 
-            // Step 7: Build new outer zip (uncompressed) containing original sign and new data
+            // Step 10: Build new outer zip (uncompressed) containing original sign and new data
             byte[] newOuterZipBytes;
             using (MemoryStream newOuterMs = new())
             {
@@ -193,7 +229,7 @@ public static class StaticDataPatcher
                 newOuterZipBytes = newOuterMs.ToArray();
             }
 
-            // Step 8: Encrypt outer zip using AES-CBC
+            // Step 11: Encrypt outer zip using AES-CBC
             byte[] newPackBytes;
             using (Aes aesOuter = Aes.Create())
             {
@@ -212,15 +248,16 @@ public static class StaticDataPatcher
                 newPackBytes = msOut.ToArray();
             }
 
-            // Step 9: Backup original and write patched file
+            // Step 12: Backup original and write patched file
             string backupPath = packPath + ".bak";
             if (!File.Exists(backupPath))
             {
                 File.Copy(packPath, backupPath);
             }
 
-            File.WriteAllBytes(packPath, newPackBytes);
-            Logging.WriteLine($"[StaticDataPatcher] Successfully patched StaticData.pack ({newPackBytes.Length} bytes). Video cutscene URLs are now localized and viewable.", LogType.Info);
+            await File.WriteAllBytesAsync(packPath, newPackBytes);
+            await File.WriteAllTextAsync(markerPath, "patched");
+            Logging.WriteLine($"[StaticDataPatcher] Successfully patched StaticData.pack ({newPackBytes.Length} bytes). Video cutscenes are now localized and viewable.", LogType.Info);
 
             return true;
         }
@@ -231,52 +268,148 @@ public static class StaticDataPatcher
         }
     }
 
-    private static byte[] PatchScenarioMovieTable(byte[] movieTableBytes, byte[] oldLink)
+    private static List<string> ExtractUnlocalizedUrls(ScenarioMovieRecord[] records)
     {
-        byte[] patched = (byte[])movieTableBytes.Clone();
-        string[] languages = ["en", "ja", "ko", "zh-TW", "zh-CN", "de", "th", "fr"];
-
-        foreach (string lang in languages)
+        HashSet<string> unlocalized = [];
+        foreach (ScenarioMovieRecord record in records)
         {
-            byte[] idBytes = MakeMemoryPackString($"coinrushshowdown_{lang}");
-            int idIndex = IndexOf(patched, idBytes);
-            if (idIndex == -1) continue;
-
-            string targetLang = (lang is "en" or "ja" or "ko") ? lang : "en";
-            string newUrl = $"https://cloud.nikke-kr.com/media/coinrushshowdown/coinrushshowdown_{targetLang}.mp4";
-            byte[] newLink = MakeMemoryPackString(newUrl);
-
-            int linkIndex = IndexOf(patched, oldLink, idIndex);
-            if (linkIndex != -1 && linkIndex - idIndex < 300)
+            if (string.IsNullOrEmpty(record.MovieLink))
             {
-                byte[] next = new byte[patched.Length - oldLink.Length + newLink.Length];
-                Buffer.BlockCopy(patched, 0, next, 0, linkIndex);
-                Buffer.BlockCopy(newLink, 0, next, linkIndex, newLink.Length);
-                Buffer.BlockCopy(patched, linkIndex + oldLink.Length, next, linkIndex + newLink.Length, patched.Length - (linkIndex + oldLink.Length));
-                patched = next;
+                continue;
+            }
+
+            if (IsUnlocalizedUrl(record.MovieLink))
+            {
+                unlocalized.Add(record.MovieLink);
+            }
+        }
+        return [.. unlocalized];
+    }
+
+    private static bool IsUnlocalizedUrl(string url)
+    {
+        if (!url.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string withoutExt = url[..^4].ToLowerInvariant();
+        foreach (string tag in KnownLanguageTags)
+        {
+            if (withoutExt.EndsWith(tag, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
             }
         }
 
-        return patched;
+        return true;
     }
 
-    private static byte[] MakeMemoryPackString(string s)
+    private static async Task<Dictionary<string, Dictionary<string, string>>> DetectDefectiveUrlsAsync(List<string> candidateUrls)
     {
-        byte[] sBytes = Encoding.UTF8.GetBytes(s);
-        int u16Len = s.Length;
-        int invLen = ~u16Len;
-        byte[] result = new byte[8 + sBytes.Length];
-        BinaryPrimitives.WriteInt32LittleEndian(result.AsSpan(0, 4), invLen);
-        BinaryPrimitives.WriteInt32LittleEndian(result.AsSpan(4, 4), sBytes.Length);
-        Buffer.BlockCopy(sBytes, 0, result, 8, sBytes.Length);
-        return result;
+        Dictionary<string, Dictionary<string, string>> defectiveMap = [];
+
+        var probeTasks = candidateUrls.Select(async url =>
+        {
+            try
+            {
+                using HttpRequestMessage headReq = new(HttpMethod.Head, url);
+                using HttpResponseMessage headResp = await ProbeClient.SendAsync(headReq);
+                if (headResp.StatusCode == HttpStatusCode.NotFound)
+                {
+                    // Base URL returns 404 on CDN; check if localized siblings exist
+                    string withoutExt = url[..^4];
+                    string[] probeLangs = ["en", "ja", "ko"];
+
+                    var variantTasks = probeLangs.Select(async lang =>
+                    {
+                        string variantUrl = $"{withoutExt}_{lang}.mp4";
+                        try
+                        {
+                            using HttpRequestMessage vReq = new(HttpMethod.Head, variantUrl);
+                            using HttpResponseMessage vResp = await ProbeClient.SendAsync(vReq);
+                            return (lang, variantUrl, exists: vResp.StatusCode == HttpStatusCode.OK);
+                        }
+                        catch
+                        {
+                            return (lang, variantUrl, exists: false);
+                        }
+                    }).ToArray();
+
+                    var variantResults = await Task.WhenAll(variantTasks);
+                    var existingVariants = variantResults.Where(x => x.exists).ToDictionary(x => x.lang, x => x.variantUrl);
+
+                    if (existingVariants.Count > 0)
+                    {
+                        string fallbackUrl = existingVariants.TryGetValue("en", out var enUrl)
+                            ? enUrl
+                            : existingVariants.Values.First();
+
+                        Dictionary<string, string> langMap = [];
+                        foreach (string lang in SupportedLanguages)
+                        {
+                            langMap[lang] = existingVariants.TryGetValue(lang, out var specificUrl)
+                                ? specificUrl
+                                : fallbackUrl;
+                        }
+
+                        return (url, (Dictionary<string, string>?)langMap);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.WriteLine($"[StaticDataPatcher] Probe skipped for {url}: {ex.Message}", LogType.Warning);
+            }
+
+            return (url, null);
+        }).ToArray();
+
+        var probeResults = await Task.WhenAll(probeTasks);
+        foreach (var (url, langMap) in probeResults)
+        {
+            if (langMap != null)
+            {
+                defectiveMap[url] = langMap;
+            }
+        }
+
+        // Offline safety fallback: if probe was offline, ensure known defects are handled
+        if (defectiveMap.Count == 0)
+        {
+            foreach (string url in candidateUrls)
+            {
+                if (url.EndsWith("coinrushshowdown/coinrushshowdown.mp4", StringComparison.OrdinalIgnoreCase))
+                {
+                    string withoutExt = url[..^4];
+                    Dictionary<string, string> langMap = [];
+                    foreach (string lang in SupportedLanguages)
+                    {
+                        string targetLang = (lang is "en" or "ja" or "ko") ? lang : "en";
+                        langMap[lang] = $"{withoutExt}_{targetLang}.mp4";
+                    }
+                    defectiveMap[url] = langMap;
+                }
+            }
+        }
+
+        return defectiveMap;
     }
 
-    private static int IndexOf(byte[] source, byte[] pattern, int startIndex = 0)
+    private static byte[] PatchScenarioMovieTable(ScenarioMovieRecord[] records, Dictionary<string, Dictionary<string, string>> defectiveMap)
     {
-        ReadOnlySpan<byte> src = source.AsSpan(startIndex);
-        ReadOnlySpan<byte> pat = pattern;
-        int idx = src.IndexOf(pat);
-        return idx == -1 ? -1 : startIndex + idx;
+        foreach (ScenarioMovieRecord record in records)
+        {
+            if (record.MovieLink != null && defectiveMap.TryGetValue(record.MovieLink, out var langMap))
+            {
+                string lang = record.Language ?? "en";
+                if (langMap.TryGetValue(lang, out var newUrl))
+                {
+                    record.MovieLink = newUrl;
+                }
+            }
+        }
+
+        return MemoryPackSerializer.Serialize(records);
     }
 }
