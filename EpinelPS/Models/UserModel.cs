@@ -163,6 +163,7 @@ public class User
     // Archive unlock state. These are persisted in db.json with the rest of the user.
     public List<int> UnlockedArchiveRecordIds { get; set; } = [];
     public List<int> UnlockedArchiveEventQuestIds { get; set; } = [];
+    public int ActivatedArchiveEventQuestId { get; set; } = 0;
 
     public Dictionary<int, NormalShopState> NormalShopStates { get; set; } = []; // key: shop category    
     public List<NetPlaySodaEachGameInfo> ArcadePlaySodaInfoList { get; set; } = [];

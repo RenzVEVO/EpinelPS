@@ -43,6 +43,22 @@ public class EventHelper
         List<NetEventData> dailyMissionEvents = GetDailyMissionEventData(eventManagers);
         log.Debug($"Found {dailyMissionEvents.Count} associated daily mission events: {JsonConvert.SerializeObject(dailyMissionEvents)}");
         AddEvents(ref response, dailyMissionEvents);
+
+        // add active archive event quest if activated by user
+        if (user.ActivatedArchiveEventQuestId != 0 &&
+            GameData.Instance.archiveRecordManagerTable.TryGetValue(user.ActivatedArchiveEventQuestId, out var archiveRecord) &&
+            GameData.Instance.eventManagers.TryGetValue(archiveRecord.RecordMainArchiveEventId, out var em))
+        {
+            NetEventData questEvent = new()
+            {
+                Id = em.Id,
+                EventStartDate = DateTime.UtcNow.AddDays(-21).Ticks,
+                EventVisibleDate = DateTime.UtcNow.AddDays(-21).Ticks,
+                EventDisableDate = DateTime.UtcNow.AddDays(30).Ticks,
+                EventEndDate = DateTime.UtcNow.AddDays(30).Ticks,
+            };
+            AddEvents(ref response, [questEvent]);
+        }
     }
 
     public static void AddJoinedEvents(User user, ref ResGetJoinedEvent response)
@@ -79,6 +95,22 @@ public class EventHelper
         List<NetEventData> dailyMissionEvents = GetDailyMissionEventData(eventManagers);
         log.Debug($"Found {dailyMissionEvents.Count} associated daily mission events: {JsonConvert.SerializeObject(dailyMissionEvents)}");
         AddJoinedEvents(ref response, dailyMissionEvents);
+
+        // add active archive event quest if activated by user
+        if (user.ActivatedArchiveEventQuestId != 0 &&
+            GameData.Instance.archiveRecordManagerTable.TryGetValue(user.ActivatedArchiveEventQuestId, out var archiveRecord) &&
+            GameData.Instance.eventManagers.TryGetValue(archiveRecord.RecordMainArchiveEventId, out var em))
+        {
+            NetEventData questEvent = new()
+            {
+                Id = em.Id,
+                EventStartDate = DateTime.UtcNow.AddDays(-21).Ticks,
+                EventVisibleDate = DateTime.UtcNow.AddDays(-21).Ticks,
+                EventDisableDate = DateTime.UtcNow.AddDays(30).Ticks,
+                EventEndDate = DateTime.UtcNow.AddDays(30).Ticks,
+            };
+            AddJoinedEvents(ref response, [questEvent]);
+        }
     }
 
     private static List<NetEventData> GetEventData(LobbyPrivateBannerRecord banner, List<EventManagerRecord> eventManagers)
