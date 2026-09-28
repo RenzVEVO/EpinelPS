@@ -183,6 +183,12 @@ public class GameData
     [LoadRecord("ArchiveMessengerConditionTable.json", "Id")]
     public readonly Dictionary<int, ArchiveMessengerConditionRecord> archiveMessengerConditionRecords = [];
 
+    [LoadRecord("ArchiveEventQuestManagerTable.json", "Id")]
+    public readonly Dictionary<int, ArchiveEventQuestManagerRecord_Raw> archiveEventQuestManagerRecords = [];
+
+    [LoadRecord("EventQuestStageTable.json", "Id")]
+    public readonly Dictionary<int, EventQuestStageRecord> eventQuestStageRecords = [];
+
     [LoadRecord("CharacterStatTable.json", "Id")]
     public readonly Dictionary<int, CharacterStatRecord> characterStatTable = [];
 

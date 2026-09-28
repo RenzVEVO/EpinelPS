@@ -46,25 +46,111 @@ public class GetArchives : LobbyMessage
                 .AddRange(user.UnlockedArchiveEventQuestIds);
         }
 
+        Dictionary<int, int> fallbackEventToManagerMap = new()
+        {
+            { 130001, 10001 }, // Fool's Day (Shifty)
+            { 130002, 10002 }, // First Affection (Marian)
+            { 130004, 10004 }, // Liar's End (Syuen)
+            { 130005, 10005 }, // Nonsense Red (Red Hood)
+            { 130006, 10006 }, // Out of Uniform
+            { 130007, 10007 }, // Fool Burst Day (Mecha Shifty)
+        };
+
         foreach (var record in eventQuestRecords)
         {
             if (GameConfig.Root.ArchiveUnlockAll == true || user.UnlockedArchiveEventQuestIds.Contains(record.Id))
             {
+                int managerId = 0;
+                var managerRecord = GameData.Instance.archiveEventQuestManagerRecords.Values
+                    .FirstOrDefault(m => m.EventId == record.RecordMainArchiveEventId);
+                if (managerRecord != null)
+                {
+                    managerId = managerRecord.Id;
+                }
+                else if (fallbackEventToManagerMap.TryGetValue(record.RecordMainArchiveEventId, out int mappedId))
+                {
+                    managerId = mappedId;
+                }
+
+                if (managerId == 0) continue;
+
                 var mapping = new ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData
                 {
                     ArchiveRecordManagerId = record.Id,
                 };
 
-                int managerId = record.Id / 100;
+                // 1. Quests for this manager
                 var quests = GameData.Instance.archiveEventQuestRecords.Values
                     .Where(q => q.EventQuestManagerId == managerId)
                     .OrderBy(q => q.Id)
                     .ToList();
-
                 mapping.EventQuestIdList.AddRange(quests.Select(q => q.Id));
-                if (quests.Count > 0)
+
+                // 2. Stages for this manager
+                var stages = GameData.Instance.eventQuestStageRecords.Values
+                    .Where(s => s.ArchiveEventQuestManagerId == managerId)
+                    .OrderBy(s => s.Id)
+                    .ToList();
+
+                foreach (var s in stages)
                 {
-                    mapping.CurrentArchiveEventQuestIdList.Add(quests.First().Id);
+                    bool isCleared = user.ClearedArchiveEventQuestStageIds.Contains(s.Id);
+                    var stageState = isCleared
+                        ? ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData.Types.StageData.Types.StageState.Cleared
+                        : ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData.Types.StageData.Types.StageState.Entered;
+
+                    mapping.EventQuestStageList.Add(new ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData.Types.StageData
+                    {
+                        StageId = s.Id,
+                        State = stageState
+                    });
+
+                    if (isCleared)
+                    {
+                        mapping.CumulativeArchiveEventQuestStageList.Add(new ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData.Types.StageData
+                        {
+                            StageId = s.Id,
+                            State = ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData.Types.StageData.Types.StageState.Cleared
+                        });
+                    }
+                }
+
+                // 3. Cleared quests
+                var clearedQuests = quests
+                    .Where(q => user.ClearedArchiveEventQuestIds.Contains(q.Id))
+                    .Select(q => q.Id)
+                    .ToList();
+                mapping.CumulativeArchiveEventQuestIdList.AddRange(clearedQuests);
+
+                // 4. Current quest in chain
+                ArchiveEventQuestRecord_Raw? currentQuest = quests.FirstOrDefault();
+                while (currentQuest != null && user.ClearedArchiveEventQuestIds.Contains(currentQuest.Id))
+                {
+                    if (currentQuest.NextQuestId != 0 && currentQuest.ConditionType != Category.End)
+                    {
+                        currentQuest = quests.FirstOrDefault(q => q.Id == currentQuest.NextQuestId);
+                    }
+                    else
+                    {
+                        currentQuest = null; // Reached end of quest chain
+                    }
+                }
+
+                if (currentQuest != null)
+                {
+                    mapping.CurrentArchiveEventQuestIdList.Add(currentQuest.Id);
+                }
+
+                // 5. Current stage if any
+                var currentStage = stages.FirstOrDefault(s => !user.ClearedArchiveEventQuestStageIds.Contains(s.Id) &&
+                    (s.SpawnConditionArchiveEventQuestId == 0 || user.ClearedArchiveEventQuestIds.Contains(s.SpawnConditionArchiveEventQuestId)));
+                if (currentStage != null)
+                {
+                    mapping.CurrentArchiveEventQuestStageList.Add(new ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData.Types.StageData
+                    {
+                        StageId = currentStage.Id,
+                        State = ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData.Types.StageData.Types.StageState.Entered
+                    });
                 }
 
                 response.ArchiveEventQuest.EventQuestMappingList.Add(mapping);
