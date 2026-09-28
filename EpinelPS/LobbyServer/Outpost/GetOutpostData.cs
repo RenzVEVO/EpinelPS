@@ -79,10 +79,91 @@ public class GetOutpostData : LobbyMessage
             JsonDb.Save();
         }
 
+        InjectVirtualEventQuestBuilding(user, response.Data);
+
         response.TimeRewardBuffs.AddRange(NetUtils.GetOutpostTimeReward(user));
         response.ConditionTriggerTidList.AddRange(user.ClearedOutpostScenarioIds);
 
         // TODO
         await WriteDataAsync(response);
+    }
+
+    public static int GetActiveEventQuestTargetBuildingId(User user)
+    {
+        if (user.ActivatedArchiveEventQuestId == 0) return 0;
+
+        var arm = GameData.Instance.archiveRecordManagerTable.GetValueOrDefault(user.ActivatedArchiveEventQuestId);
+        if (arm == null) return 0;
+
+        int managerId = 0;
+        var aeqm = GameData.Instance.archiveEventQuestManagerRecords.Values
+            .FirstOrDefault(m => m.EventId == arm.RecordMainArchiveEventId);
+        if (aeqm != null)
+        {
+            managerId = aeqm.Id;
+        }
+        else
+        {
+            Dictionary<int, int> fallbackMap = new()
+            {
+                { 130001, 10001 },
+                { 130002, 10002 },
+                { 130004, 10004 },
+                { 130005, 10005 },
+                { 130006, 10006 },
+                { 130007, 10007 },
+            };
+            fallbackMap.TryGetValue(arm.RecordMainArchiveEventId, out managerId);
+        }
+
+        if (managerId == 0) return 0;
+
+        var quests = GameData.Instance.archiveEventQuestRecords.Values
+            .Where(q => q.EventQuestManagerId == managerId)
+            .OrderBy(q => q.Id)
+            .ToList();
+
+        ArchiveEventQuestRecord_Raw? currentQuest = quests.FirstOrDefault();
+        while (currentQuest != null && user.ClearedArchiveEventQuestIds.Contains(currentQuest.Id))
+        {
+            if (currentQuest.NextQuestId != 0 && currentQuest.ConditionType != Category.End)
+            {
+                currentQuest = quests.FirstOrDefault(q => q.Id == currentQuest.NextQuestId);
+            }
+            else
+            {
+                currentQuest = null;
+            }
+        }
+
+        if (currentQuest != null && currentQuest.ConditionType == Category.OutpostSelect && currentQuest.ConditionValue > 0)
+        {
+            return currentQuest.ConditionValue;
+        }
+
+        return 0;
+    }
+
+    public static void InjectVirtualEventQuestBuilding(User user, ICollection<NetUserOutpostData> responseBuildings)
+    {
+        int targetBuildingId = GetActiveEventQuestTargetBuildingId(user);
+        if (targetBuildingId <= 0) return;
+
+        if (user.OutpostBuildings != null && user.OutpostBuildings.Any(b => b.BuildingId == targetBuildingId))
+        {
+            return;
+        }
+
+        int virtualSlot = Enumerable.Range(11, 27)
+            .FirstOrDefault(s => responseBuildings.All(b => b.SlotId != s), 11);
+
+        responseBuildings.Add(new NetUserOutpostData
+        {
+            SlotId = virtualSlot,
+            BuildingId = targetBuildingId,
+            IsDone = true,
+            StartAt = 638549982076760660,
+            CompleteAt = 638549982076760660
+        });
     }
 }

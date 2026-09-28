@@ -141,18 +141,28 @@ public class GetArchives : LobbyMessage
                     mapping.CurrentArchiveEventQuestIdList.Add(currentQuest.Id);
                 }
 
-                // 5. Current stage if any
-                var currentStage = stages.FirstOrDefault(s => !user.ClearedArchiveEventQuestStageIds.Contains(s.Id) &&
-                    (s.SpawnConditionArchiveEventQuestId == 0 || user.ClearedArchiveEventQuestIds.Contains(s.SpawnConditionArchiveEventQuestId)));
-                if (currentStage != null)
+                // 5. Current stage if any: only populate when current quest is at a stage clear condition
+                if (currentQuest != null)
                 {
-                    mapping.CurrentArchiveEventQuestStageList.Add(new ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData.Types.StageData
+                    EventQuestStageRecord? activeStage = null;
+                    if (currentQuest.ConditionType == Category.EventQuestStageClear)
                     {
-                        StageId = currentStage.Id,
-                        State = ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData.Types.StageData.Types.StageState.Entered
-                    });
-                }
+                        activeStage = stages.FirstOrDefault(s => s.Id == currentQuest.ConditionValue && !user.ClearedArchiveEventQuestStageIds.Contains(s.Id));
+                    }
+                    else if (currentQuest.ConditionType == Category.EventQuestStageGroupClear)
+                    {
+                        activeStage = stages.FirstOrDefault(s => s.GroupId == currentQuest.ConditionValue && !user.ClearedArchiveEventQuestStageIds.Contains(s.Id));
+                    }
 
+                    if (activeStage != null)
+                    {
+                        mapping.CurrentArchiveEventQuestStageList.Add(new ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData.Types.StageData
+                        {
+                            StageId = activeStage.Id,
+                            State = ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData.Types.StageData.Types.StageState.Entered
+                        });
+                    }
+                }
                 response.ArchiveEventQuest.EventQuestMappingList.Add(mapping);
             }
         }

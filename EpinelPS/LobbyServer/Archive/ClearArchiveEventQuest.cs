@@ -14,10 +14,40 @@ public class ClearArchiveEventQuest : LobbyMessage
         User user = GetUser();
         ResClearArchiveEventQuest response = new();
 
-        if (req.ArchiveEventQuestId != 0 && !user.ClearedArchiveEventQuestIds.Contains(req.ArchiveEventQuestId))
+        if (req.ArchiveEventQuestId != 0)
         {
-            user.ClearedArchiveEventQuestIds.Add(req.ArchiveEventQuestId);
-            JsonDb.Save();
+            bool changed = false;
+            if (GameData.Instance.archiveEventQuestRecords.TryGetValue(req.ArchiveEventQuestId, out var targetQuest))
+            {
+                var managerQuests = GameData.Instance.archiveEventQuestRecords.Values
+                    .Where(q => q.EventQuestManagerId == targetQuest.EventQuestManagerId)
+                    .OrderBy(q => q.Id)
+                    .ToList();
+
+                // Backfill all prerequisite quests in the chain up to targetQuest
+                var curr = managerQuests.FirstOrDefault();
+                while (curr != null)
+                {
+                    if (!user.ClearedArchiveEventQuestIds.Contains(curr.Id))
+                    {
+                        user.ClearedArchiveEventQuestIds.Add(curr.Id);
+                        changed = true;
+                    }
+
+                    if (curr.Id == targetQuest.Id) break;
+                    curr = curr.NextQuestId != 0 ? managerQuests.FirstOrDefault(q => q.Id == curr.NextQuestId) : null;
+                }
+            }
+            else if (!user.ClearedArchiveEventQuestIds.Contains(req.ArchiveEventQuestId))
+            {
+                user.ClearedArchiveEventQuestIds.Add(req.ArchiveEventQuestId);
+                changed = true;
+            }
+
+            if (changed)
+            {
+                JsonDb.Save();
+            }
         }
 
         await WriteDataAsync(response);
