@@ -243,12 +243,15 @@ public class RewardUtils
 
 
 
-            // Check if user already has said item. Non-equipment items should stack.
-            DbItemData? existingItem = rewardType.ToString().StartsWith("Equipment")
+            ItemSubType itemSubType = GameData.Instance.GetItemSubType(rewardId);
+            bool isUnique = rewardType.ToString().StartsWith("Equipment") || itemSubType == ItemSubType.HarmonyCube;
+
+            // Check if user already has said item. Non-equipment and non-harmony-cube items should stack.
+            DbItemData? existingItem = isUnique
                 ? null
                 : user.Items.FirstOrDefault(x => x.ItemType == rewardId);
 
-            if (existingItem != null && !rewardType.ToString().StartsWith("Equipment"))
+            if (existingItem != null && !isUnique)
             {
                 existingItem.Count += rewardCount;
 
@@ -261,13 +264,7 @@ public class RewardUtils
                 });
 
                 // Tell the client the new amount of this item
-                ret.UserItems.Add(new NetUserItemData()
-                {
-                    Isn = existingItem.Isn,
-                    Tid = existingItem.ItemType,
-                    Count = existingItem.Count,
-                    Corporation = existingItem.Corp
-                });
+                ret.UserItems.Add(NetUtils.UserItemDataToNet(existingItem));
             }
             else if (rewardType.ToString().StartsWith("Equipment"))
             {
@@ -275,7 +272,6 @@ public class RewardUtils
                 Console.WriteLine($"[UseBundleBox] װ����Ʒ Id{rewardId} ��������װ����");
 
                 int level = 0; // Default to 0
-                ItemSubType itemSubType = GameData.Instance.GetItemSubType(rewardId);
 
                 // Check if Harmony Cube set level to 1
                 if (itemSubType == ItemSubType.HarmonyCube)
@@ -297,13 +293,7 @@ public class RewardUtils
                     });
 
                     // Tell the client the new amount of this item
-                    ret.UserItems.Add(new NetUserItemData()
-                    {
-                        Isn = newItem.Isn,
-                        Tid = newItem.ItemType,
-                        Count = newItem.Count,
-                        Corporation = newItem.Corp
-                    });
+                    ret.UserItems.Add(NetUtils.UserItemDataToNet(newItem));
                 }
 
             }
@@ -311,14 +301,15 @@ public class RewardUtils
             {
                 int id = user.GenerateUniqueItemId();
                 int level = 0; // Default to 0
-                ItemSubType itemSubType = GameData.Instance.GetItemSubType(rewardId);
+                int position = 0;
 
-                // Check if Harmony Cube set level to 1
+                // Check if Harmony Cube set level to 1 and position to location ID
                 if (itemSubType == ItemSubType.HarmonyCube)
                 {
                     level = 1;
+                    position = NetUtils.GetHarmonyCubePosition(rewardId);
                 }
-                var newItem = new DbItemData() { ItemType = rewardId, Isn = id, Level = level, Exp = 0, Count = rewardCount, Corp = corpId };
+                var newItem = new DbItemData() { ItemType = rewardId, Isn = id, Level = level, Exp = 0, Count = rewardCount, Corp = corpId, Position = position };
                 user.Items.Add(newItem);
 
                 ret.Item.Add(new NetItemData()
@@ -329,13 +320,7 @@ public class RewardUtils
                 });
 
                 // Tell the client the new amount of this item
-                ret.UserItems.Add(new NetUserItemData()
-                {
-                    Isn = newItem.Isn,
-                    Tid = newItem.ItemType,
-                    Count = newItem.Count,
-                    Corporation = newItem.Corp
-                });
+                ret.UserItems.Add(NetUtils.UserItemDataToNet(newItem));
             }
         }
         else if (rewardType == RewardType.Memorial)

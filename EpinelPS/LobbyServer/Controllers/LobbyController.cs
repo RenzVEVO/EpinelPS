@@ -66,6 +66,8 @@ public class LobbyController(IUserService UserService, GameContext db) : Control
         {
             response.Items.Add(item);
         }
+        response.HarmonyCubes.AddRange(NetUtils.GetUserHarmonyCubes(user));
+
 
         // Add squad data if there are characters
         if (user.Characters.Count > 0)
