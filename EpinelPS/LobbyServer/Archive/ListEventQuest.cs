@@ -1,4 +1,6 @@
 using EpinelPS.Data;
+using EpinelPS.Database;
+using EpinelPS.Models;
 
 namespace EpinelPS.LobbyServer.Archive;
 
@@ -10,6 +12,7 @@ public class ListEventQuest : LobbyMessage
     protected override async Task HandleAsync()
     {
         ReqListEventQuest req = await ReadData<ReqListEventQuest>();
+        User user = GetUser();
         ResListEventQuest response = new();
 
         var quests = GameData.Instance.archiveEventQuestRecords.Values
@@ -21,7 +24,7 @@ public class ListEventQuest : LobbyMessage
             response.EventQuests.Add(new NetEventQuestData
             {
                 EventQuestId = q.Id,
-                IsReceived = false
+                IsReceived = user.ClearedArchiveEventQuestIds.Contains(q.Id)
             });
         }
 
@@ -49,8 +52,16 @@ public class ClearEventQuestStage : LobbyMessage
 {
     protected override async Task HandleAsync()
     {
-        _ = await ReadData<ReqClearEventQuestStage>();
+        ReqClearEventQuestStage req = await ReadData<ReqClearEventQuestStage>();
+        User user = GetUser();
         ResClearEventQuestStage response = new();
+
+        if (req.StageId != 0 && !user.ClearedArchiveEventQuestStageIds.Contains(req.StageId))
+        {
+            user.ClearedArchiveEventQuestStageIds.Add(req.StageId);
+            JsonDb.Save();
+        }
+
         await WriteDataAsync(response);
     }
 }
@@ -74,8 +85,16 @@ public class FinEventQuest : LobbyMessage
 {
     protected override async Task HandleAsync()
     {
-        _ = await ReadData<ReqFinEventQuest>();
+        ReqFinEventQuest req = await ReadData<ReqFinEventQuest>();
+        User user = GetUser();
         ResFinEventQuest response = new();
+
+        if (req.EventQuestTid != 0 && !user.ClearedArchiveEventQuestIds.Contains(req.EventQuestTid))
+        {
+            user.ClearedArchiveEventQuestIds.Add(req.EventQuestTid);
+            JsonDb.Save();
+        }
+
         await WriteDataAsync(response);
     }
 }

@@ -5,6 +5,7 @@ using EpinelPS.Utils;
 namespace EpinelPS.LobbyServer.Archive.Field;
 
 [GameRequest("/archive/field/item/save")]
+[GameRequest("/archive/field/saveobject")]
 public class SaveArchiveFieldItem : LobbyMessage
 {
     protected override async Task HandleAsync()
