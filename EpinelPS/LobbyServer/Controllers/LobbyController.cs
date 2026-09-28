@@ -2,6 +2,7 @@ using EpinelPS.Data;
 using EpinelPS.Database;
 using EpinelPS.Interfaces;
 using EpinelPS.Utils;
+using EpinelPS.LobbyServer.Outpost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 
@@ -125,6 +126,8 @@ public class LobbyController(IUserService UserService, GameContext db) : Control
             user.OutpostBuildings = defaultBuildings;
             JsonDb.Save();
         }
+
+        GetOutpostData.InjectVirtualEventQuestBuilding(user, response.Outposts);
 
         response.LastClearedNormalMainStageId = user.LastNormalStageCleared;
         response.LastClearedStoryStageId = user.LastStoryStageCleared;
