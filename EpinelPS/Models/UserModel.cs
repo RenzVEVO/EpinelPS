@@ -182,6 +182,8 @@ public class User
     public bool DailyDiscountUsed { get; set; } = false;
     [Newtonsoft.Json.JsonIgnore]
     public bool NeedsTriggerSyncRestart { get; set; } = false;
+    [Newtonsoft.Json.JsonIgnore]
+    public long LastMissionReconciledTicks { get; set; } = 0;
 
     // solo raid data
     public Dictionary<int, SoloRaidInfo> SoloRaidData = []; // key: raidId

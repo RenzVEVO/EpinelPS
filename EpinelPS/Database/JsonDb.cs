@@ -13,6 +13,11 @@ internal class JsonDb
     // Note: change this in sodium
     public static byte[] ServerPrivateKey = Convert.FromBase64String("FSUY8Ohd942n5LWAfxn6slK3YGwc8OqmyJoJup9nNos=");
     public static byte[] ServerPublicKey = Convert.FromBase64String("04hFDd1e/BOEF2h4b0MdkX2h6W5REeqyW+0r9+eSeh0=");
+    private static readonly object _saveLock = new();
+    private static int _isDirty = 0;
+    private static readonly CancellationTokenSource _cts = new();
+    private static readonly Task _backgroundFlusherTask;
+
 
     static JsonDb()
     {
@@ -20,7 +25,7 @@ internal class JsonDb
         {
             Console.WriteLine("users: warning: configuration not found, writing default data");
             Instance = new CoreInfo();
-            Save();
+            FlushImmediate();
         }
 
 
@@ -67,6 +72,9 @@ internal class JsonDb
             ValidateDb();
             Save();
             Console.WriteLine("JsonDb: Loaded");
+
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => FlushImmediate();
+            _backgroundFlusherTask = Task.Run(BackgroundFlusherLoop);
         }
         else
         {
@@ -167,9 +175,60 @@ internal class JsonDb
 
     public static void Save()
     {
-        if (Instance != null)
+        Interlocked.Exchange(ref _isDirty, 1);
+    }
+
+    public static void FlushImmediate()
+    {
+        lock (_saveLock)
         {
-            File.WriteAllText(AppDomain.CurrentDomain.BaseDirectory + "/db.json", JsonConvert.SerializeObject(Instance, Formatting.Indented));
+            Interlocked.Exchange(ref _isDirty, 0);
+            FlushToFile();
+        }
+    }
+
+    private static async Task BackgroundFlusherLoop()
+    {
+        while (!_cts.Token.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(500, _cts.Token);
+                if (Interlocked.CompareExchange(ref _isDirty, 0, 1) == 1)
+                {
+                    FlushToFile();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                Logging.WriteLine($"[JsonDb] Background flush error: {ex.Message}", LogType.Error);
+            }
+        }
+    }
+
+    private static void FlushToFile()
+    {
+        lock (_saveLock)
+        {
+            if (Instance == null) return;
+            try
+            {
+                string basePath = AppDomain.CurrentDomain.BaseDirectory;
+                string targetPath = Path.Combine(basePath, "db.json");
+                string tempPath = Path.Combine(basePath, "db.json.tmp");
+
+                string json = JsonConvert.SerializeObject(Instance, Formatting.Indented);
+                File.WriteAllText(tempPath, json);
+                File.Move(tempPath, targetPath, overwrite: true);
+            }
+            catch (Exception ex)
+            {
+                Logging.WriteLine($"[JsonDb] Failed to write db.json: {ex.Message}", LogType.Error);
+            }
         }
     }
     public static int CurrentJukeboxBgm(int position)

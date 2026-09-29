@@ -118,10 +118,7 @@ public class GetOutpostData : LobbyMessage
 
         if (managerId == 0) return 0;
 
-        var quests = GameData.Instance.archiveEventQuestRecords.Values
-            .Where(q => q.EventQuestManagerId == managerId)
-            .OrderBy(q => q.Id)
-            .ToList();
+        var quests = GameData.Instance.GetArchiveEventQuestsForManager(managerId);
 
         ArchiveEventQuestRecord_Raw? currentQuest = quests.FirstOrDefault();
         while (currentQuest != null && user.ClearedArchiveEventQuestIds.Contains(currentQuest.Id))

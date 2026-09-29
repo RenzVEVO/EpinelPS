@@ -6,6 +6,7 @@ using System.Data;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using System.Globalization;
 
 namespace EpinelPS.Data;
 
@@ -29,6 +30,15 @@ public class GameData
     private int currentFile;
 
     public readonly Dictionary<string, FieldMapRecord> MapData = [];
+    public readonly Dictionary<string, NetJupiterProductInfo> JupiterProductCache = [];
+    public readonly Dictionary<int, List<ArchiveEventQuestRecord_Raw>> ArchiveEventQuestsByManager = [];
+    public readonly Dictionary<int, List<EventQuestStageRecord>> EventQuestStagesByArchiveManager = [];
+
+    public IReadOnlyList<ArchiveEventQuestRecord_Raw> GetArchiveEventQuestsForManager(int managerId) =>
+        ArchiveEventQuestsByManager.TryGetValue(managerId, out var list) ? list : [];
+
+    public IReadOnlyList<EventQuestStageRecord> GetEventQuestStagesForArchiveManager(int managerId) =>
+        EventQuestStagesByArchiveManager.TryGetValue(managerId, out var list) ? list : [];
 
     //ArchiveEvent
     [LoadRecord("ArchiveEventDungeonTable.json", "Id")]
@@ -944,6 +954,42 @@ public class GameData
 
         // sanity checks
         if (QuestDataRecords.Count == 0) throw new Exception("QuestDataRecords should not be empty");
+
+        BuildOptimizedLookups();
+    }
+
+    private void BuildOptimizedLookups()
+    {
+        JupiterProductCache.Clear();
+        foreach (var (key, record) in mediasProductTable)
+        {
+            if (string.IsNullOrEmpty(record.Cost)) continue;
+            string normalizedCost = record.Cost.Replace(',', '.');
+            if (decimal.TryParse(normalizedCost, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal price))
+            {
+                long microPrice = (long)(price * 1000000);
+                JupiterProductCache[key] = new NetJupiterProductInfo
+                {
+                    CurrencyCode = "USD",
+                    CurrencySymbol = "$",
+                    MicroPrice = microPrice,
+                    Price = record.Cost,
+                    ProductId = key
+                };
+            }
+        }
+
+        ArchiveEventQuestsByManager.Clear();
+        foreach (var group in archiveEventQuestRecords.Values.GroupBy(q => q.EventQuestManagerId))
+        {
+            ArchiveEventQuestsByManager[group.Key] = group.OrderBy(q => q.Id).ToList();
+        }
+
+        EventQuestStagesByArchiveManager.Clear();
+        foreach (var group in eventQuestStageRecords.Values.GroupBy(s => s.ArchiveEventQuestManagerId))
+        {
+            EventQuestStagesByArchiveManager[group.Key] = group.OrderBy(s => s.Id).ToList();
+        }
     }
 
     public MainQuestRecord? GetMainQuestForStageClearCondition(int stage)
