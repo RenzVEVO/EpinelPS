@@ -446,22 +446,30 @@ public class User
         return Characters.Where(x => x.Csn == value).FirstOrDefault();
     }
 
-    internal bool GetSynchro(long csn)
+    public bool GetSynchro(long csn)
     {
         return SynchroSlots.Where(x => x.CharacterSerialNumber == csn).Any();
     }
-    internal int GetCharacterLevel(int csn)
+    public int GetCharacterLevel(long csn)
     {
         var c = GetCharacterBySerialNumber(csn) ?? throw new Exception("failed to lookup character");
         return GetCharacterLevel(csn, c.Level);
     }
-    internal int GetCharacterLevel(int csn, int characterLevel)
+    public int GetCharacterLevel(long csn, int characterLevel)
     {
         foreach (var item in SynchroSlots)
         {
             if (item.CharacterSerialNumber == csn)
             {
                 return GetSynchroLevel();
+            }
+        }
+        if (SynchroDeviceUpgraded)
+        {
+            var highestLevelCharacters = Characters.OrderByDescending(x => x.Level).Take(5);
+            if (highestLevelCharacters.Any(x => x.Csn == csn))
+            {
+                return Math.Max(characterLevel, GetSynchroLevel());
             }
         }
         return characterLevel;

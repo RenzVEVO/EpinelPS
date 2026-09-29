@@ -31,6 +31,10 @@ public class SynchroLevelUp : LobbyMessage
             user.SubtractCurrency(CurrencyType.CharacterExp, requiredBattleData);
             user.SubtractCurrency(CurrencyType.CharacterExp2, requiredCoreDust);
             user.SynchroDeviceLevel++;
+            foreach (CharacterModel c in user.Characters.OrderByDescending(x => x.Level).Take(5))
+            {
+                c.Level = Math.Max(c.Level, user.SynchroDeviceLevel);
+            }
         }
         else
         {
