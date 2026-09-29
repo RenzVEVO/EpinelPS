@@ -126,6 +126,30 @@ internal class JsonDb
                 }
             }
 
+            // Sanitize synchro slots: standard characters should never occupy registered slots
+            if (user.Characters.Count >= 5)
+            {
+                var standardCsns = user.Characters.OrderByDescending(x => x.Level).Take(5).Select(x => (long)x.Csn).ToHashSet();
+                foreach (var slot in user.SynchroSlots)
+                {
+                    if (slot.CharacterSerialNumber != 0 && standardCsns.Contains(slot.CharacterSerialNumber))
+                    {
+                        Console.WriteLine($"Sanitizing synchro slot {slot.Slot}: standard character {slot.CharacterSerialNumber} removed from slot");
+                        slot.CharacterSerialNumber = 0;
+                    }
+                }
+            }
+
+            // Ensure SynchroDeviceLevel does not regress below standard characters when upgraded
+            if (user.SynchroDeviceUpgraded && user.Characters.Count >= 5)
+            {
+                int minStandardLv = user.Characters.OrderByDescending(x => x.Level).Take(5).Min(x => x.Level);
+                if (user.SynchroDeviceLevel < minStandardLv)
+                {
+                    user.SynchroDeviceLevel = minStandardLv;
+                }
+            }
+
             // upgrade the gacha pull counters if using older system
             // Since we can't know what banners they pulled, we'll assume standard.
             // If user.GachaTutorialPlayCount is still 0, the user has not gone through the tutorial yet.
