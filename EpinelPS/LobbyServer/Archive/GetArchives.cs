@@ -79,18 +79,12 @@ public class GetArchives : LobbyMessage
                     ArchiveRecordManagerId = record.Id,
                 };
 
-                // 1. Quests for this manager
-                var quests = GameData.Instance.archiveEventQuestRecords.Values
-                    .Where(q => q.EventQuestManagerId == managerId)
-                    .OrderBy(q => q.Id)
-                    .ToList();
+                // 1. Quests for this manager (pre-indexed O(1))
+                var quests = GameData.Instance.GetArchiveEventQuestsForManager(managerId);
                 mapping.EventQuestIdList.AddRange(quests.Select(q => q.Id));
 
-                // 2. Stages for this manager
-                var stages = GameData.Instance.eventQuestStageRecords.Values
-                    .Where(s => s.ArchiveEventQuestManagerId == managerId)
-                    .OrderBy(s => s.Id)
-                    .ToList();
+                // 2. Stages for this manager (pre-indexed O(1))
+                var stages = GameData.Instance.GetEventQuestStagesForArchiveManager(managerId);
 
                 foreach (var s in stages)
                 {
