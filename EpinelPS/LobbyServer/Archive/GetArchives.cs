@@ -108,21 +108,6 @@ public class GetArchives : LobbyMessage
                     mapping.CurrentArchiveEventQuestIdList.Add(currentQuest.Id);
                 }
 
-                // If the current active quest is NOT an OutpostView quest (e.g. OutpostSelect on Command Center),
-                // mask any subsequent OutpostView quests in CumulativeArchiveEventQuestIdList so that
-                // scene-load OutpostView events do NOT prematurely hijack the outpost before the player can interact!
-                if (currentQuest != null && currentQuest.ConditionType != Category.OutpostView)
-                {
-                    var futureOutpostViewQuests = quests
-                        .Where(q => q.Id > currentQuest.Id && q.ConditionType == Category.OutpostView);
-                    foreach (var fq in futureOutpostViewQuests)
-                    {
-                        if (!mapping.CumulativeArchiveEventQuestIdList.Contains(fq.Id))
-                        {
-                            mapping.CumulativeArchiveEventQuestIdList.Add(fq.Id);
-                        }
-                    }
-                }
 
                 // 4. Unlocked quests in client list: cleared quests plus the active current quest
                 mapping.EventQuestIdList.AddRange(clearedQuests);

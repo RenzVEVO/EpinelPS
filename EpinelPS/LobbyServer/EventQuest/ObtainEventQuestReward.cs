@@ -23,6 +23,7 @@ public class ObtainEventQuestReward : LobbyMessage
 
         user.ReceivedArchiveEventQuestRewardIds ??= [];
 
+        List<int> rewardIdsToGive = [];
         bool changed = false;
         foreach (int questTid in req.EventQuestTidList)
         {
@@ -30,7 +31,18 @@ public class ObtainEventQuestReward : LobbyMessage
             {
                 user.ReceivedArchiveEventQuestRewardIds.Add(questTid);
                 changed = true;
+
+                if (GameData.Instance.EventQuestTable.TryGetValue(questTid, out var questRec) && questRec.RewardId > 0)
+                {
+                    rewardIdsToGive.Add(questRec.RewardId);
+                }
             }
+        }
+
+        if (rewardIdsToGive.Count > 0)
+        {
+            response.Reward = RewardUtils.RegisterRewardsForUserDou(user, rewardIdsToGive);
+            changed = true;
         }
 
         if (changed)
