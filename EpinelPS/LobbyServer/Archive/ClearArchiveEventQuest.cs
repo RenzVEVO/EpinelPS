@@ -24,18 +24,31 @@ public class ClearArchiveEventQuest : LobbyMessage
                     .OrderBy(q => q.Id)
                     .ToList();
 
-                // Backfill all prerequisite quests in the chain up to targetQuest
-                var curr = managerQuests.FirstOrDefault();
-                while (curr != null)
+                ArchiveEventQuestRecord_Raw? expectedCurrent = managerQuests.FirstOrDefault();
+                while (expectedCurrent != null && user.ClearedArchiveEventQuestIds.Contains(expectedCurrent.Id))
                 {
-                    if (!user.ClearedArchiveEventQuestIds.Contains(curr.Id))
+                    if (expectedCurrent.NextQuestId != 0 && expectedCurrent.ConditionType != Category.End)
                     {
-                        user.ClearedArchiveEventQuestIds.Add(curr.Id);
+                        expectedCurrent = managerQuests.FirstOrDefault(q => q.Id == expectedCurrent.NextQuestId);
+                    }
+                    else
+                    {
+                        expectedCurrent = null;
+                    }
+                }
+
+                // Authoritative check: only allow clearing the exact expected current quest in the chain
+                if (expectedCurrent != null && req.ArchiveEventQuestId == expectedCurrent.Id)
+                {
+                    if (!user.ClearedArchiveEventQuestIds.Contains(req.ArchiveEventQuestId))
+                    {
+                        user.ClearedArchiveEventQuestIds.Add(req.ArchiveEventQuestId);
                         changed = true;
                     }
-
-                    if (curr.Id == targetQuest.Id) break;
-                    curr = curr.NextQuestId != 0 ? managerQuests.FirstOrDefault(q => q.Id == curr.NextQuestId) : null;
+                }
+                else if (expectedCurrent != null && req.ArchiveEventQuestId != expectedCurrent.Id)
+                {
+                    Logging.WriteLine($"[ClearArchiveEventQuest] Rejecting out-of-order claim for quest {req.ArchiveEventQuestId}; expected active quest is {expectedCurrent.Id}", LogType.Warning);
                 }
             }
             else if (!user.ClearedArchiveEventQuestIds.Contains(req.ArchiveEventQuestId))

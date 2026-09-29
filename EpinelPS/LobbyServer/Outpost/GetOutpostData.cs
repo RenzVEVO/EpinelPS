@@ -146,21 +146,33 @@ public class GetOutpostData : LobbyMessage
         int targetBuildingId = GetActiveEventQuestTargetBuildingId(user);
         if (targetBuildingId <= 0) return;
 
-        if (user.OutpostBuildings != null && user.OutpostBuildings.Any(b => b.BuildingId == targetBuildingId))
+        if (user.OutpostBuildings == null)
+        {
+            user.OutpostBuildings = [];
+        }
+
+        if (user.OutpostBuildings.Any(b => b.BuildingId == targetBuildingId))
         {
             return;
         }
 
         int virtualSlot = Enumerable.Range(11, 27)
-            .FirstOrDefault(s => responseBuildings.All(b => b.SlotId != s), 11);
+            .FirstOrDefault(s => user.OutpostBuildings.All(b => b.SlotId != s) && responseBuildings.All(b => b.SlotId != s), 11);
 
-        responseBuildings.Add(new NetUserOutpostData
+        var newBuilding = new NetUserOutpostData
         {
             SlotId = virtualSlot,
             BuildingId = targetBuildingId,
             IsDone = true,
             StartAt = 638549982076760660,
             CompleteAt = 638549982076760660
-        });
+        };
+
+        user.OutpostBuildings.Add(newBuilding);
+        if (!responseBuildings.Any(b => b.SlotId == newBuilding.SlotId))
+        {
+            responseBuildings.Add(newBuilding);
+        }
+        JsonDb.Save();
     }
 }
