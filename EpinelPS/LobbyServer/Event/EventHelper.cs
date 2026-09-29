@@ -52,6 +52,7 @@ public class EventHelper
             NetEventData questEvent = new()
             {
                 Id = em.Id,
+                EventSystemType = (int)em.EventSystemType,
                 EventStartDate = DateTime.UtcNow.AddDays(-21).Ticks,
                 EventVisibleDate = DateTime.UtcNow.AddDays(-21).Ticks,
                 EventDisableDate = DateTime.UtcNow.AddDays(30).Ticks,
@@ -104,12 +105,20 @@ public class EventHelper
             NetEventData questEvent = new()
             {
                 Id = em.Id,
+                EventSystemType = (int)em.EventSystemType,
                 EventStartDate = DateTime.UtcNow.AddDays(-21).Ticks,
                 EventVisibleDate = DateTime.UtcNow.AddDays(-21).Ticks,
                 EventDisableDate = DateTime.UtcNow.AddDays(30).Ticks,
                 EventEndDate = DateTime.UtcNow.AddDays(30).Ticks,
             };
-            AddJoinedEvents(ref response, [questEvent]);
+            if (!response.EventWithJoinData.Any(e => e.EventData.Id == questEvent.Id))
+            {
+                response.EventWithJoinData.Add(new NetEventWithJoinData()
+                {
+                    EventData = questEvent,
+                    JoinAt = DateTime.UtcNow.Ticks
+                });
+            }
         }
     }
 

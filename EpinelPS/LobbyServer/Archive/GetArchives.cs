@@ -81,8 +81,55 @@ public class GetArchives : LobbyMessage
 
                 // 1. Quests for this manager (pre-indexed O(1))
                 var quests = GameData.Instance.GetArchiveEventQuestsForManager(managerId);
-                mapping.EventQuestIdList.AddRange(quests.Select(q => q.Id));
 
+                // 2. Cleared quests
+                var clearedQuests = quests
+                    .Where(q => user.ClearedArchiveEventQuestIds.Contains(q.Id))
+                    .Select(q => q.Id)
+                    .ToList();
+                mapping.CumulativeArchiveEventQuestIdList.AddRange(clearedQuests);
+
+                // 3. Current quest in chain
+                ArchiveEventQuestRecord_Raw? currentQuest = quests.FirstOrDefault();
+                while (currentQuest != null && user.ClearedArchiveEventQuestIds.Contains(currentQuest.Id))
+                {
+                    if (currentQuest.NextQuestId != 0 && currentQuest.ConditionType != Category.End)
+                    {
+                        currentQuest = quests.FirstOrDefault(q => q.Id == currentQuest.NextQuestId);
+                    }
+                    else
+                    {
+                        currentQuest = null; // Reached end of quest chain
+                    }
+                }
+
+                if (currentQuest != null)
+                {
+                    mapping.CurrentArchiveEventQuestIdList.Add(currentQuest.Id);
+                }
+
+                // If the current active quest is NOT an OutpostView quest (e.g. OutpostSelect on Command Center),
+                // mask any subsequent OutpostView quests in CumulativeArchiveEventQuestIdList so that
+                // scene-load OutpostView events do NOT prematurely hijack the outpost before the player can interact!
+                if (currentQuest != null && currentQuest.ConditionType != Category.OutpostView)
+                {
+                    var futureOutpostViewQuests = quests
+                        .Where(q => q.Id > currentQuest.Id && q.ConditionType == Category.OutpostView);
+                    foreach (var fq in futureOutpostViewQuests)
+                    {
+                        if (!mapping.CumulativeArchiveEventQuestIdList.Contains(fq.Id))
+                        {
+                            mapping.CumulativeArchiveEventQuestIdList.Add(fq.Id);
+                        }
+                    }
+                }
+
+                // 4. Unlocked quests in client list: cleared quests plus the active current quest
+                mapping.EventQuestIdList.AddRange(clearedQuests);
+                if (currentQuest != null && !mapping.EventQuestIdList.Contains(currentQuest.Id))
+                {
+                    mapping.EventQuestIdList.Add(currentQuest.Id);
+                }
                 // 2. Stages for this manager (pre-indexed O(1))
                 var stages = GameData.Instance.GetEventQuestStagesForArchiveManager(managerId);
 
@@ -107,32 +154,6 @@ public class GetArchives : LobbyMessage
                             State = ResGetArchiveRecord.Types.ArchiveEventQuestData.Types.EventQuestMappingData.Types.StageData.Types.StageState.Cleared
                         });
                     }
-                }
-
-                // 3. Cleared quests
-                var clearedQuests = quests
-                    .Where(q => user.ClearedArchiveEventQuestIds.Contains(q.Id))
-                    .Select(q => q.Id)
-                    .ToList();
-                mapping.CumulativeArchiveEventQuestIdList.AddRange(clearedQuests);
-
-                // 4. Current quest in chain
-                ArchiveEventQuestRecord_Raw? currentQuest = quests.FirstOrDefault();
-                while (currentQuest != null && user.ClearedArchiveEventQuestIds.Contains(currentQuest.Id))
-                {
-                    if (currentQuest.NextQuestId != 0 && currentQuest.ConditionType != Category.End)
-                    {
-                        currentQuest = quests.FirstOrDefault(q => q.Id == currentQuest.NextQuestId);
-                    }
-                    else
-                    {
-                        currentQuest = null; // Reached end of quest chain
-                    }
-                }
-
-                if (currentQuest != null)
-                {
-                    mapping.CurrentArchiveEventQuestIdList.Add(currentQuest.Id);
                 }
 
                 // 5. Current stage if any: only populate when current quest is at a stage clear condition
