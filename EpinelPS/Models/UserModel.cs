@@ -167,6 +167,7 @@ public class User
     public List<int> ClearedArchiveEventQuestIds { get; set; } = [];
     public List<int> ClearedArchiveEventQuestStageIds { get; set; } = [];
     public List<int> ReceivedArchiveEventQuestRewardIds { get; set; } = [];
+    public List<int> ClaimedArchiveEventClearRewardIds { get; set; } = [];
 
     public Dictionary<int, NormalShopState> NormalShopStates { get; set; } = []; // key: shop category    
     public List<NetPlaySodaEachGameInfo> ArcadePlaySodaInfoList { get; set; } = [];

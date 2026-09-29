@@ -119,6 +119,8 @@ public class ResetArchiveEventQuest : LobbyMessage
 
                 user.ClearedArchiveEventQuestIds.RemoveAll(id => quests.Contains(id));
                 user.ClearedArchiveEventQuestStageIds.RemoveAll(id => stages.Contains(id));
+                user.ReceivedArchiveEventQuestRewardIds.RemoveAll(id => quests.Contains(id));
+                user.ClaimedArchiveEventClearRewardIds.Remove(req.ArchiveRecordManagerId);
                 JsonDb.Save();
             }
         }
@@ -127,23 +129,34 @@ public class ResetArchiveEventQuest : LobbyMessage
     }
 }
 
-[GameRequest("/archive/event-quest/reward/acquire")]
-[GameRequest("/archive/event-quest/acquire-reward")]
-[GameRequest("/archive/event-quest/reward/obtain")]
-public class AcquireArchiveEventQuestReward : LobbyMessage
-{
-    protected override async Task HandleAsync()
-    {
-        ReqAcquireArchiveEventQuestReward req = await ReadData<ReqAcquireArchiveEventQuestReward>();
-        User user = GetUser();
-        ResAcquireArchiveEventQuestReward response = new();
-
-        var arm = GameData.Instance.archiveRecordManagerTable.GetValueOrDefault(req.ArchiveRecordManagerId);
-        if (arm != null && arm.EventQuestClearRewardId > 0)
-        {
-            response.Reward = RewardUtils.RegisterRewardsForUser(user, arm.EventQuestClearRewardId);
-            JsonDb.Save();
-        }
+ [GameRequest("/archive/event-quest/reward/acquire")]
+ [GameRequest("/archive/event-quest/acquire-reward")]
+ [GameRequest("/archive/event-quest/reward/obtain")]
+ [GameRequest("/archive/event-quest/obtain-reward")]
+ [GameRequest("/archive/event-quest/obtain")]
+ public class AcquireArchiveEventQuestReward : LobbyMessage
+ {
+     protected override async Task HandleAsync()
+     {
+         ReqAcquireArchiveEventQuestReward req = await ReadData<ReqAcquireArchiveEventQuestReward>();
+         User user = GetUser();
+         ResAcquireArchiveEventQuestReward response = new()
+         {
+             Reward = new NetRewardData()
+         };
+ 
+         user.ClaimedArchiveEventClearRewardIds ??= [];
+ 
+         var arm = GameData.Instance.archiveRecordManagerTable.GetValueOrDefault(req.ArchiveRecordManagerId);
+         if (arm != null && arm.EventQuestClearRewardId > 0)
+         {
+             if (!user.ClaimedArchiveEventClearRewardIds.Contains(req.ArchiveRecordManagerId))
+             {
+                 user.ClaimedArchiveEventClearRewardIds.Add(req.ArchiveRecordManagerId);
+                 response.Reward = RewardUtils.RegisterRewardsForUser(user, arm.EventQuestClearRewardId);
+                 JsonDb.Save();
+             }
+         }
 
         await WriteDataAsync(response);
     }
