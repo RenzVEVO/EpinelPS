@@ -1,3 +1,4 @@
+using EpinelPS.Data;
 using EpinelPS.Database;
 
 namespace EpinelPS.LobbyServer.Archive;
@@ -27,6 +28,28 @@ public class CompleteScenario : LobbyMessage
         {
             evt.CompletedScenarios.Add(scenid);
         }
+        // Also check if this completed scenario corresponds to an archive event quest
+        var matchingQuest = GameData.Instance.archiveEventQuestRecords.Values
+            .FirstOrDefault(q => q.EndScenarioId == scenid);
+        if (matchingQuest != null)
+        {
+            if (!user.ClearedArchiveEventQuestIds.Contains(matchingQuest.Id))
+            {
+                user.ClearedArchiveEventQuestIds.Add(matchingQuest.Id);
+            }
+
+            // If this quest has a prerequisite intro quest (e.g. Quest 1 before Quest 2), ensure it is marked cleared as well
+            var allManagerQuests = GameData.Instance.archiveEventQuestRecords.Values
+                .Where(q => q.EventQuestManagerId == matchingQuest.EventQuestManagerId)
+                .OrderBy(q => q.Id)
+                .ToList();
+            var q1 = allManagerQuests.FirstOrDefault();
+            if (q1 != null && matchingQuest.Id == q1.NextQuestId && !user.ClearedArchiveEventQuestIds.Contains(q1.Id))
+            {
+                user.ClearedArchiveEventQuestIds.Add(q1.Id);
+            }
+        }
+
         JsonDb.Save();
         // Prepare and send the response
         ResCompleteArchiveScenario response = new();
