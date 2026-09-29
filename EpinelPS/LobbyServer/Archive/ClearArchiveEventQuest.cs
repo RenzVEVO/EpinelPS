@@ -37,9 +37,15 @@ public class ClearArchiveEventQuest : LobbyMessage
                     }
                 }
 
-                // Authoritative check: only allow clearing the exact expected current quest in the chain
-                if (expectedCurrent != null && req.ArchiveEventQuestId == expectedCurrent.Id)
+                // Authoritative check: allow clearing the current quest, or if the client completed the intro pair (e.g. Quest 1 + Quest 2) in sequence
+                if (expectedCurrent != null && (req.ArchiveEventQuestId == expectedCurrent.Id || req.ArchiveEventQuestId == expectedCurrent.NextQuestId))
                 {
+                    if (req.ArchiveEventQuestId == expectedCurrent.NextQuestId && !user.ClearedArchiveEventQuestIds.Contains(expectedCurrent.Id))
+                    {
+                        user.ClearedArchiveEventQuestIds.Add(expectedCurrent.Id);
+                        changed = true;
+                    }
+
                     if (!user.ClearedArchiveEventQuestIds.Contains(req.ArchiveEventQuestId))
                     {
                         user.ClearedArchiveEventQuestIds.Add(req.ArchiveEventQuestId);
