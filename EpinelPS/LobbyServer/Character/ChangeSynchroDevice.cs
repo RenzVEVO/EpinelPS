@@ -26,15 +26,45 @@ public class ChangeSynchroDevice : LobbyMessage
         user.SynchroDeviceLevel = Math.Max(user.SynchroDeviceLevel, minStandardLevel);
         user.SynchroDeviceUpgraded = true;
 
-        if (user.SynchroSlots.Count == 0)
+        // Ensure at least 5 slots exist
+        while (user.SynchroSlots.Count < 5)
         {
-            user.SynchroSlots = [
-                new SynchroSlot() { Slot = 1 },
-                new SynchroSlot() { Slot = 2 },
-                new SynchroSlot() { Slot = 3 },
-                new SynchroSlot() { Slot = 4 },
-                new SynchroSlot() { Slot = 5 },
-            ];
+            user.SynchroSlots.Add(new SynchroSlot { Slot = user.SynchroSlots.Count + 1, AvailableAt = 1 });
+        }
+
+        // Preserve any existing non-standard characters in slots 1-5
+        var top5Csns = highestLevelCharacters.Select(h => (long)h.Csn).ToHashSet();
+        List<long> displacedCsns = user.SynchroSlots
+            .Where(s => s.Slot <= 5 && s.CharacterSerialNumber != 0 && !top5Csns.Contains(s.CharacterSerialNumber))
+            .Select(s => s.CharacterSerialNumber)
+            .ToList();
+
+        // Lock standard characters into slots 1-5
+        for (int i = 0; i < 5; i++)
+        {
+            int slotNum = i + 1;
+            SynchroSlot? targetSlot = user.SynchroSlots.FirstOrDefault(s => s.Slot == slotNum);
+            if (targetSlot != null)
+            {
+                targetSlot.CharacterSerialNumber = highestLevelCharacters[i].Csn;
+                targetSlot.AvailableAt = 1;
+            }
+        }
+
+        // Shift any displaced characters to slots 6+
+        foreach (long displacedCsn in displacedCsns)
+        {
+            var emptySlot = user.SynchroSlots.FirstOrDefault(s => s.Slot > 5 && s.CharacterSerialNumber == 0);
+            if (emptySlot != null)
+            {
+                emptySlot.CharacterSerialNumber = displacedCsn;
+                emptySlot.AvailableAt = 1;
+            }
+            else
+            {
+                int newSlotNum = user.SynchroSlots.Max(s => s.Slot) + 1;
+                user.SynchroSlots.Add(new SynchroSlot { Slot = newSlotNum, CharacterSerialNumber = displacedCsn, AvailableAt = 1 });
+            }
         }
 
         foreach (CharacterModel item in highestLevelCharacters)
@@ -58,7 +88,7 @@ public class ChangeSynchroDevice : LobbyMessage
             });
         }
 
-        foreach (SynchroSlot item in user.SynchroSlots)
+        foreach (SynchroSlot item in user.SynchroSlots.OrderBy(s => s.Slot))
         {
             response.Slots.Add(new NetSynchroSlot()
             {

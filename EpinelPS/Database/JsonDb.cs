@@ -126,27 +126,55 @@ internal class JsonDb
                 }
             }
 
-            // Sanitize synchro slots: standard characters should never occupy registered slots
+            // Synchro Device: For upgraded devices, lock slots 1-5 to the top 5 characters
             if (user.Characters.Count >= 5)
             {
-                var standardCsns = user.Characters.OrderByDescending(x => x.Level).Take(5).Select(x => (long)x.Csn).ToHashSet();
-                foreach (var slot in user.SynchroSlots)
+                var top5 = user.Characters.OrderByDescending(x => x.Level).Take(5).ToList();
+                var top5Csns = top5.Select(x => (long)x.Csn).ToHashSet();
+
+                if (user.SynchroDeviceUpgraded)
                 {
-                    if (slot.CharacterSerialNumber != 0 && standardCsns.Contains(slot.CharacterSerialNumber))
+                    while (user.SynchroSlots.Count < 5)
                     {
-                        Console.WriteLine($"Sanitizing synchro slot {slot.Slot}: standard character {slot.CharacterSerialNumber} removed from slot");
-                        slot.CharacterSerialNumber = 0;
+                        user.SynchroSlots.Add(new SynchroSlot { Slot = user.SynchroSlots.Count + 1, AvailableAt = 1 });
+                    }
+
+                    for (int i = 0; i < 5; i++)
+                    {
+                        int slotNum = i + 1;
+                        var s = user.SynchroSlots.FirstOrDefault(x => x.Slot == slotNum);
+                        if (s != null && s.CharacterSerialNumber != top5[i].Csn)
+                        {
+                            s.CharacterSerialNumber = top5[i].Csn;
+                            s.AvailableAt = 1;
+                        }
+                    }
+
+                    // Prune any top 5 standard characters if they appear in slots > 5
+                    foreach (var slot in user.SynchroSlots.Where(s => s.Slot > 5))
+                    {
+                        if (slot.CharacterSerialNumber != 0 && top5Csns.Contains(slot.CharacterSerialNumber))
+                        {
+                            slot.CharacterSerialNumber = 0;
+                        }
+                    }
+
+                    int minStandardLv = top5.Min(x => x.Level);
+                    if (user.SynchroDeviceLevel < minStandardLv)
+                    {
+                        user.SynchroDeviceLevel = minStandardLv;
                     }
                 }
-            }
-
-            // Ensure SynchroDeviceLevel does not regress below standard characters when upgraded
-            if (user.SynchroDeviceUpgraded && user.Characters.Count >= 5)
-            {
-                int minStandardLv = user.Characters.OrderByDescending(x => x.Level).Take(5).Min(x => x.Level);
-                if (user.SynchroDeviceLevel < minStandardLv)
+                else
                 {
-                    user.SynchroDeviceLevel = minStandardLv;
+                    // For non-upgraded devices, standard characters are on pedestals, not slots
+                    foreach (var slot in user.SynchroSlots)
+                    {
+                        if (slot.CharacterSerialNumber != 0 && top5Csns.Contains(slot.CharacterSerialNumber))
+                        {
+                            slot.CharacterSerialNumber = 0;
+                        }
+                    }
                 }
             }
 
