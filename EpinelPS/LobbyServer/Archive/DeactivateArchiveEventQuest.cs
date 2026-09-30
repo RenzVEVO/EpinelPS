@@ -3,6 +3,8 @@ using EpinelPS.Database;
 namespace EpinelPS.LobbyServer.Archive;
 
 [GameRequest("/archive/event-quest/deactivate")]
+[GameRequest("/event-quest/deactivate")]
+[GameRequest("/event/event-quest/deactivate")]
 public class DeactivateArchiveEventQuest : LobbyMessage
 {
     protected override async Task HandleAsync()

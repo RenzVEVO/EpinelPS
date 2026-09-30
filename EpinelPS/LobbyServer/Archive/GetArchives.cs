@@ -25,6 +25,7 @@ public class GetArchives : LobbyMessage
         else
         {
             response.UnlockedArchiveRecordList.AddRange(user.UnlockedArchiveRecordIds);
+            response.UnlockedArchiveRecordList.AddRange(user.UnlockedArchiveEventQuestIds.Where(id => !user.UnlockedArchiveRecordIds.Contains(id)));
         }
 
         List<ArchiveRecordManagerRecord> eventQuestRecords = [.. records
@@ -109,12 +110,8 @@ public class GetArchives : LobbyMessage
                 }
 
 
-                // 4. Unlocked quests in client list: cleared quests plus the active current quest
-                mapping.EventQuestIdList.AddRange(clearedQuests);
-                if (currentQuest != null && !mapping.EventQuestIdList.Contains(currentQuest.Id))
-                {
-                    mapping.EventQuestIdList.Add(currentQuest.Id);
-                }
+                // 4. Quest list: all quests for this manager
+                mapping.EventQuestIdList.AddRange(quests.Select(q => q.Id));
                 // 2. Stages for this manager (pre-indexed O(1))
                 var stages = GameData.Instance.GetEventQuestStagesForArchiveManager(managerId);
 

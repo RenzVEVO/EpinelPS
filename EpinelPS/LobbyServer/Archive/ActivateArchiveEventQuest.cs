@@ -5,6 +5,8 @@ using EpinelPS.Utils;
 namespace EpinelPS.LobbyServer.Archive;
 
 [GameRequest("/archive/event-quest/activate")]
+[GameRequest("/event-quest/activate")]
+[GameRequest("/event/event-quest/activate")]
 public class ActivateArchiveEventQuest : LobbyMessage
 {
     protected override async Task HandleAsync()
