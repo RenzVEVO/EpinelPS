@@ -16,51 +16,7 @@ public class ClearArchiveEventQuest : LobbyMessage
 
         if (req.ArchiveEventQuestId != 0)
         {
-            bool changed = false;
-            if (GameData.Instance.archiveEventQuestRecords.TryGetValue(req.ArchiveEventQuestId, out var targetQuest))
-            {
-                var managerQuests = GameData.Instance.archiveEventQuestRecords.Values
-                    .Where(q => q.EventQuestManagerId == targetQuest.EventQuestManagerId)
-                    .OrderBy(q => q.Id)
-                    .ToList();
-
-                ArchiveEventQuestRecord_Raw? expectedCurrent = managerQuests.FirstOrDefault();
-                while (expectedCurrent != null && user.ClearedArchiveEventQuestIds.Contains(expectedCurrent.Id))
-                {
-                    if (expectedCurrent.NextQuestId != 0 && expectedCurrent.ConditionType != Category.End)
-                    {
-                        expectedCurrent = managerQuests.FirstOrDefault(q => q.Id == expectedCurrent.NextQuestId);
-                    }
-                    else
-                    {
-                        expectedCurrent = null;
-                    }
-                }
-
-                // Authoritative check: strictly only allow clearing the exact expected active quest
-                if (expectedCurrent != null && req.ArchiveEventQuestId == expectedCurrent.Id)
-                {
-                    if (!user.ClearedArchiveEventQuestIds.Contains(req.ArchiveEventQuestId))
-                    {
-                        user.ClearedArchiveEventQuestIds.Add(req.ArchiveEventQuestId);
-                        changed = true;
-                    }
-                }
-                else if (expectedCurrent != null && req.ArchiveEventQuestId != expectedCurrent.Id)
-                {
-                    Logging.WriteLine($"[ClearArchiveEventQuest] Rejecting out-of-order claim for quest {req.ArchiveEventQuestId}; expected active quest is {expectedCurrent.Id}", LogType.Warning);
-                }
-            }
-            else if (!user.ClearedArchiveEventQuestIds.Contains(req.ArchiveEventQuestId))
-            {
-                user.ClearedArchiveEventQuestIds.Add(req.ArchiveEventQuestId);
-                changed = true;
-            }
-
-            if (changed)
-            {
-                JsonDb.Save();
-            }
+            ArchiveEventQuestHelper.OnArchiveQuestCleared(user, req.ArchiveEventQuestId);
         }
 
         await WriteDataAsync(response);
@@ -178,10 +134,9 @@ public class ClearArchiveEventQuestStage : LobbyMessage
         User user = GetUser();
         ResClearArchiveEventQuestStage response = new();
 
-        if (req.EventQuestStageId != 0 && !user.ClearedArchiveEventQuestStageIds.Contains(req.EventQuestStageId))
+        if (req.EventQuestStageId != 0 && req.BattleResult == 1)
         {
-            user.ClearedArchiveEventQuestStageIds.Add(req.EventQuestStageId);
-            JsonDb.Save();
+            ArchiveEventQuestHelper.OnStageCleared(user, req.EventQuestStageId);
         }
 
         await WriteDataAsync(response);

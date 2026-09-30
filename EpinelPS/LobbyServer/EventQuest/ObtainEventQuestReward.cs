@@ -10,6 +10,10 @@ namespace EpinelPS.LobbyServer.EventQuest;
 [GameRequest("/eventquest/reward/obtain")]
 [GameRequest("/eventquest/obtainreward")]
 [GameRequest("/eventquest/obtain-reward")]
+[GameRequest("/event-quest/obtainreward")]
+[GameRequest("/event-quest/reward/obtain")]
+[GameRequest("/event-quest/reward")]
+[GameRequest("/event-quest/obtain")]
 public class ObtainEventQuestReward : LobbyMessage
 {
     protected override async Task HandleAsync()

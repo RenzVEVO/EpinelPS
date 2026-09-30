@@ -18,28 +18,7 @@ public class WatchAlbumScenarioLog : LobbyMessage
                 .FirstOrDefault(q => q.EndScenarioId == albumRec.ScenarioGroupId);
             if (matchingQuest != null)
             {
-                bool changed = false;
-                if (!user.ClearedArchiveEventQuestIds.Contains(matchingQuest.Id))
-                {
-                    user.ClearedArchiveEventQuestIds.Add(matchingQuest.Id);
-                    changed = true;
-                }
-
-                var allManagerQuests = GameData.Instance.archiveEventQuestRecords.Values
-                    .Where(q => q.EventQuestManagerId == matchingQuest.EventQuestManagerId)
-                    .OrderBy(q => q.Id)
-                    .ToList();
-                var q1 = allManagerQuests.FirstOrDefault();
-                if (q1 != null && matchingQuest.Id == q1.NextQuestId && !user.ClearedArchiveEventQuestIds.Contains(q1.Id))
-                {
-                    user.ClearedArchiveEventQuestIds.Add(q1.Id);
-                    changed = true;
-                }
-
-                if (changed)
-                {
-                    JsonDb.Save();
-                }
+                Archive.ArchiveEventQuestHelper.OnArchiveQuestCleared(user, matchingQuest.Id);
             }
         }
 
