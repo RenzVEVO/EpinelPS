@@ -35,26 +35,7 @@ public class ResetArchiveEventQuest : LobbyMessage
         var arm = GameData.Instance.archiveRecordManagerTable.GetValueOrDefault(req.ArchiveRecordManagerId);
         if (arm != null)
         {
-            int managerId = 0;
-            var aeqm = GameData.Instance.archiveEventQuestManagerRecords.Values
-                .FirstOrDefault(m => m.EventId == arm.RecordMainArchiveEventId);
-            if (aeqm != null)
-            {
-                managerId = aeqm.Id;
-            }
-            else
-            {
-                Dictionary<int, int> map = new()
-                {
-                    { 130001, 10001 },
-                    { 130002, 10002 },
-                    { 130004, 10004 },
-                    { 130005, 10005 },
-                    { 130006, 10006 },
-                    { 130007, 10007 },
-                };
-                map.TryGetValue(arm.RecordMainArchiveEventId, out managerId);
-            }
+            int managerId = ArchiveEventQuestHelper.ResolveManagerId(req.ArchiveRecordManagerId);
 
             if (managerId != 0)
             {
@@ -71,6 +52,10 @@ public class ResetArchiveEventQuest : LobbyMessage
                 user.ClearedArchiveEventQuestStageIds.RemoveAll(id => stages.Contains(id));
                 user.ReceivedArchiveEventQuestRewardIds.RemoveAll(id => quests.Contains(id));
                 user.ClaimedArchiveEventClearRewardIds.Remove(req.ArchiveRecordManagerId);
+                if (user.ActivatedArchiveEventQuestId == req.ArchiveRecordManagerId)
+                {
+                    user.ActivatedArchiveEventQuestId = 0;
+                }
                 JsonDb.Save();
             }
         }

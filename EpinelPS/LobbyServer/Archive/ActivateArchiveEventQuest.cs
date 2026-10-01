@@ -35,8 +35,13 @@ public class ActivateArchiveEventQuest : LobbyMessage
                 .Select(s => s.Id)
                 .ToHashSet();
 
-            // When beginning/activating an event quest, start fresh at 0%
-            if (user.ActivatedArchiveEventQuestId != record.Id || ArchiveEventQuestHelper.GetCurrentActiveQuest(user, managerId) == null)
+            // When activating an event quest:
+            // If starting a different event quest, or if this event quest was previously completed,
+            // start fresh at 0% with Quest 1.
+            // If already in-progress on this event, preserve player's progress across logins and scene switches!
+            bool isCompleted = ArchiveEventQuestHelper.GetCurrentActiveQuest(user, managerId) == null &&
+                               user.ClearedArchiveEventQuestIds.Any(id => quests.Contains(id));
+            if (user.ActivatedArchiveEventQuestId != record.Id || isCompleted)
             {
                 user.ClearedArchiveEventQuestIds.RemoveAll(id => quests.Contains(id));
                 user.ClearedArchiveEventQuestStageIds.RemoveAll(id => stages.Contains(id));
