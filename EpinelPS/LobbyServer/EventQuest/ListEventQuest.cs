@@ -35,15 +35,13 @@ public class ListEventQuest : LobbyMessage
             var quests = GameData.Instance.GetArchiveEventQuestsForManager(managerId);
             foreach (var q in quests)
             {
-                if (user.ClearedArchiveEventQuestIds.Contains(q.Id))
+                if (q.ConditionType == Category.End) continue;
+                bool isReceived = user.ReceivedArchiveEventQuestRewardIds.Contains(q.Id);
+                response.EventQuests.Add(new NetEventQuestData
                 {
-                    bool isReceived = user.ReceivedArchiveEventQuestRewardIds.Contains(q.Id);
-                    response.EventQuests.Add(new NetEventQuestData
-                    {
-                        EventQuestId = q.Id,
-                        IsReceived = isReceived
-                    });
-                }
+                    EventQuestId = q.Id,
+                    IsReceived = isReceived
+                });
             }
         }
         else
