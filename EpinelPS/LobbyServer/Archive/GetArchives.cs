@@ -98,8 +98,12 @@ public class GetArchives : LobbyMessage
                     }
                 }
 
-                // 4. Quest list: all quests for this manager so the task list, mission entries, and progression bar display accurately
-                mapping.EventQuestIdList.AddRange(quests.Select(q => q.Id));
+                // 4. Quest list: sequential exposure ensures first cutscenes and building steps play in strict order
+                mapping.EventQuestIdList.AddRange(clearedQuests);
+                if (currentQuest != null && !mapping.EventQuestIdList.Contains(currentQuest.Id))
+                {
+                    mapping.EventQuestIdList.Add(currentQuest.Id);
+                }
                 // 5. Stages for this manager (pre-indexed O(1))
                 var stages = GameData.Instance.GetEventQuestStagesForArchiveManager(managerId);
 

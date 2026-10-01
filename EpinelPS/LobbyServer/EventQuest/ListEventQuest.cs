@@ -36,6 +36,7 @@ public class ListEventQuest : LobbyMessage
             foreach (var q in quests)
             {
                 if (q.ConditionType == Category.End) continue;
+                if (!user.ClearedArchiveEventQuestIds.Contains(q.Id)) continue;
                 bool isReceived = user.ReceivedArchiveEventQuestRewardIds.Contains(q.Id);
                 response.EventQuests.Add(new NetEventQuestData
                 {
