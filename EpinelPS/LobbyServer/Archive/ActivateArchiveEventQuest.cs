@@ -23,9 +23,30 @@ public class ActivateArchiveEventQuest : LobbyMessage
             throw new BadHttpRequestException($"Archive event quest record {req.ArchiveRecordManagerId} is not unlocked", 400);
         }
 
+        int managerId = ArchiveEventQuestHelper.ResolveManagerId(record.Id);
+        if (managerId != 0)
+        {
+            var quests = GameData.Instance.archiveEventQuestRecords.Values
+                .Where(q => q.EventQuestManagerId == managerId)
+                .Select(q => q.Id)
+                .ToHashSet();
+            var stages = GameData.Instance.eventQuestStageRecords.Values
+                .Where(s => s.ArchiveEventQuestManagerId == managerId)
+                .Select(s => s.Id)
+                .ToHashSet();
+
+            // When beginning/activating an event quest, start fresh at 0%
+            if (user.ActivatedArchiveEventQuestId != record.Id || ArchiveEventQuestHelper.GetCurrentActiveQuest(user, managerId) == null)
+            {
+                user.ClearedArchiveEventQuestIds.RemoveAll(id => quests.Contains(id));
+                user.ClearedArchiveEventQuestStageIds.RemoveAll(id => stages.Contains(id));
+                user.ReceivedArchiveEventQuestRewardIds.RemoveAll(id => quests.Contains(id));
+                user.ClaimedArchiveEventClearRewardIds.Remove(record.Id);
+            }
+        }
+
         user.ActivatedArchiveEventQuestId = record.Id;
         JsonDb.Save();
-
         await WriteDataAsync(response);
     }
 }
