@@ -1,5 +1,6 @@
 using EpinelPS.Data;
 using EpinelPS.Utils;
+using EpinelPS.Database;
 
 namespace EpinelPS.LobbyServer.Archive;
 
@@ -30,6 +31,16 @@ public class GetArchives : LobbyMessage
 
         List<ArchiveRecordManagerRecord> eventQuestRecords = [.. records
             .Where(record => record.RecordType == ArchiveRecordType.EventQuest)];
+
+        if (user.ActivatedArchiveEventQuestId != 0)
+        {
+            int activeMgrId = ArchiveEventQuestHelper.ResolveManagerId(user.ActivatedArchiveEventQuestId);
+            if (activeMgrId != 0 && ArchiveEventQuestHelper.GetCurrentActiveQuest(user, activeMgrId) == null)
+            {
+                user.ActivatedArchiveEventQuestId = 0;
+                JsonDb.Save();
+            }
+        }
 
         response.ArchiveEventQuest = new()
         {
@@ -75,14 +86,20 @@ public class GetArchives : LobbyMessage
                 {
                     mapping.CurrentArchiveEventQuestIdList.Add(currentQuest.Id);
                 }
-
-                // 4. Unlocked quests in client list: strictly only cleared quests plus the active current quest
-                mapping.EventQuestIdList.AddRange(clearedQuests);
-                if (currentQuest != null && !mapping.EventQuestIdList.Contains(currentQuest.Id))
+                else
                 {
-                    mapping.EventQuestIdList.Add(currentQuest.Id);
+                    // All playable quests are cleared. Populate CurrentArchiveEventQuestIdList with the last playable quest
+                    // so client-side ArchiveEventQuestInstance.GetCurrentQuest() ALWAYS resolves to a valid record
+                    // in ArchiveEventQuestTable rather than defaulting to TableId=0!
+                    var lastPlayable = ArchiveEventQuestHelper.GetLastPlayableQuest(managerId);
+                    if (lastPlayable != null)
+                    {
+                        mapping.CurrentArchiveEventQuestIdList.Add(lastPlayable.Id);
+                    }
                 }
 
+                // 4. Quest list: all quests for this manager so the task list, mission entries, and progression bar display accurately
+                mapping.EventQuestIdList.AddRange(quests.Select(q => q.Id));
                 // 5. Stages for this manager (pre-indexed O(1))
                 var stages = GameData.Instance.GetEventQuestStagesForArchiveManager(managerId);
 

@@ -66,7 +66,23 @@ public static class ArchiveEventQuestHelper
                 current = null;
             }
         }
+        if (current != null && current.ConditionType == Category.End)
+        {
+            current = null;
+        }
         return current;
+    }
+
+    /// <summary>
+    /// Gets the last playable (non-terminal sentinel) quest in the chain for a manager.
+    /// Used when all quests are cleared to safely populate mapping lists without TableId=0 exceptions.
+    /// </summary>
+    public static ArchiveEventQuestRecord_Raw? GetLastPlayableQuest(int managerId)
+    {
+        if (managerId == 0) return null;
+
+        var quests = GameData.Instance.GetArchiveEventQuestsForManager(managerId);
+        return quests.LastOrDefault(q => q.ConditionType != Category.End) ?? quests.LastOrDefault();
     }
 
     /// <summary>
@@ -93,13 +109,10 @@ public static class ArchiveEventQuestHelper
                 var currentQuest = GetCurrentActiveQuest(user, managerId);
                 if (currentQuest != null)
                 {
+                    bool questCleared = false;
                     if (currentQuest.ConditionType == Category.EventQuestStageClear && currentQuest.ConditionValue == stageId)
                     {
-                        if (!user.ClearedArchiveEventQuestIds.Contains(currentQuest.Id))
-                        {
-                            user.ClearedArchiveEventQuestIds.Add(currentQuest.Id);
-                            changed = true;
-                        }
+                        questCleared = true;
                     }
                     else if (currentQuest.ConditionType == Category.EventQuestStageGroupClear)
                     {
@@ -109,11 +122,35 @@ public static class ArchiveEventQuestHelper
 
                         if (groupStages.Count > 0 && groupStages.All(s => user.ClearedArchiveEventQuestStageIds.Contains(s.Id)))
                         {
-                            if (!user.ClearedArchiveEventQuestIds.Contains(currentQuest.Id))
+                            questCleared = true;
+                        }
+                    }
+
+                    if (questCleared)
+                    {
+                        if (!user.ClearedArchiveEventQuestIds.Contains(currentQuest.Id))
+                        {
+                            user.ClearedArchiveEventQuestIds.Add(currentQuest.Id);
+                            changed = true;
+                        }
+
+                        var nextQuest = currentQuest.NextQuestId != 0
+                            ? GameData.Instance.archiveEventQuestRecords.GetValueOrDefault(currentQuest.NextQuestId)
+                            : null;
+
+                        if (nextQuest == null || nextQuest.ConditionType == Category.End)
+                        {
+                            if (nextQuest != null && !user.ClearedArchiveEventQuestIds.Contains(nextQuest.Id))
                             {
-                                user.ClearedArchiveEventQuestIds.Add(currentQuest.Id);
-                                changed = true;
+                                user.ClearedArchiveEventQuestIds.Add(nextQuest.Id);
                             }
+
+                            if (user.ActivatedArchiveEventQuestId != 0 &&
+                                ResolveManagerId(user.ActivatedArchiveEventQuestId) == managerId)
+                            {
+                                user.ActivatedArchiveEventQuestId = 0;
+                            }
+                            changed = true;
                         }
                     }
                 }
@@ -138,60 +175,40 @@ public static class ArchiveEventQuestHelper
 
         if (GameData.Instance.archiveEventQuestRecords.TryGetValue(questId, out var targetQuest))
         {
-            var managerQuests = GameData.Instance.GetArchiveEventQuestsForManager(targetQuest.EventQuestManagerId);
-            var expectedCurrent = GetCurrentActiveQuest(user, targetQuest.EventQuestManagerId);
+            int managerId = targetQuest.EventQuestManagerId;
+            var expectedCurrent = GetCurrentActiveQuest(user, managerId);
 
-            if (expectedCurrent != null)
-            {
-                if (questId == expectedCurrent.Id)
-                {
-                    if (!user.ClearedArchiveEventQuestIds.Contains(questId))
-                    {
-                        user.ClearedArchiveEventQuestIds.Add(questId);
-                        changed = true;
-                    }
-                }
-                else if (questId == expectedCurrent.NextQuestId)
-                {
-                    // Intro transition or paired claim: auto-clear prerequisite expectedCurrent
-                    if (!user.ClearedArchiveEventQuestIds.Contains(expectedCurrent.Id))
-                    {
-                        user.ClearedArchiveEventQuestIds.Add(expectedCurrent.Id);
-                    }
-                    if (!user.ClearedArchiveEventQuestIds.Contains(questId))
-                    {
-                        user.ClearedArchiveEventQuestIds.Add(questId);
-                    }
-                    changed = true;
-                }
-                else if (questId > expectedCurrent.Id)
-                {
-                    Logging.WriteLine($"[ArchiveQuest] Synchronizing quest chain up to {questId} (expected {expectedCurrent.Id})", LogType.Warning);
-                    foreach (var q in managerQuests)
-                    {
-                        if (q.Id <= questId && !user.ClearedArchiveEventQuestIds.Contains(q.Id))
-                        {
-                            user.ClearedArchiveEventQuestIds.Add(q.Id);
-                            changed = true;
-                        }
-                    }
-                }
-            }
-            else
+            // Strictly require sequential completion: only clear if questId is the current expected quest
+            if (expectedCurrent != null && questId == expectedCurrent.Id)
             {
                 if (!user.ClearedArchiveEventQuestIds.Contains(questId))
                 {
                     user.ClearedArchiveEventQuestIds.Add(questId);
                     changed = true;
                 }
+
+                // Check if the next quest in the chain is Category.End or 0 (i.e. event chain completed)
+                var nextQuest = targetQuest.NextQuestId != 0
+                    ? GameData.Instance.archiveEventQuestRecords.GetValueOrDefault(targetQuest.NextQuestId)
+                    : null;
+
+                if (nextQuest == null || nextQuest.ConditionType == Category.End)
+                {
+                    if (nextQuest != null && !user.ClearedArchiveEventQuestIds.Contains(nextQuest.Id))
+                    {
+                        user.ClearedArchiveEventQuestIds.Add(nextQuest.Id);
+                    }
+
+                    // Complete the event quest: deactivate from outpost/lobby HUD
+                    if (user.ActivatedArchiveEventQuestId != 0 &&
+                        ResolveManagerId(user.ActivatedArchiveEventQuestId) == managerId)
+                    {
+                        user.ActivatedArchiveEventQuestId = 0;
+                    }
+                    changed = true;
+                }
             }
         }
-        else if (!user.ClearedArchiveEventQuestIds.Contains(questId))
-        {
-            user.ClearedArchiveEventQuestIds.Add(questId);
-            changed = true;
-        }
-
         if (changed)
         {
             JsonDb.Save();
