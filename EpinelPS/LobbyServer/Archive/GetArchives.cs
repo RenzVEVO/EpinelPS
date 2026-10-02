@@ -88,16 +88,16 @@ public class GetArchives : LobbyMessage
                 }
                 else
                 {
-                    // All playable quests are cleared. Populate CurrentArchiveEventQuestIdList with the last playable quest
-                    // so client-side ArchiveEventQuestInstance.GetCurrentQuest() ALWAYS resolves to a valid record
-                    // in ArchiveEventQuestTable rather than defaulting to TableId=0!
                     var lastPlayable = ArchiveEventQuestHelper.GetLastPlayableQuest(managerId);
                     if (lastPlayable != null)
                     {
                         mapping.CurrentArchiveEventQuestIdList.Add(lastPlayable.Id);
                     }
+                    else if (quests.Count > 0)
+                    {
+                        mapping.CurrentArchiveEventQuestIdList.Add(quests[0].Id);
+                    }
                 }
-
                 // 4. Quest list: all quests for this manager so EventQuestMission task list displays all entries and rewards accurately
                 mapping.EventQuestIdList.AddRange(quests.Select(q => q.Id));
                 // 5. Stages for this manager (pre-indexed O(1))

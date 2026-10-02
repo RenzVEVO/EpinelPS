@@ -65,12 +65,9 @@ public static class LobbyHandler
             }
         }
 
-        foreach (KeyValuePair<string, LobbyMessage> item in Handlers)
+        if (!Handlers.TryGetValue(path, out handler))
         {
-            if (path == item.Key)
-            {
-                handler = item.Value;
-            }
+            handler = Handlers.FirstOrDefault(x => string.Equals(x.Key, path, StringComparison.OrdinalIgnoreCase)).Value;
         }
 
         if (handler == null)

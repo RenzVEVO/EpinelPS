@@ -1,4 +1,5 @@
 ﻿using DnsClient;
+using System.Collections.Concurrent;
 using System.Net;
 
 namespace EpinelPS.Utils;
@@ -6,12 +7,19 @@ namespace EpinelPS.Utils;
 public class AssetDownloadUtil
 {
     public static readonly HttpClient AssetDownloader = new(new HttpClientHandler() { AutomaticDecompression = DecompressionMethods.All });
-
+    private static readonly ConcurrentDictionary<string, Task<string?>> InFlightDownloads = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly LookupClient DnsLookup = new();
+    private static readonly SemaphoreSlim DnsLock = new(1, 1);
     private static string? CloudIp;
     public static async Task<string?> DownloadOrGetFileAsync(string url, CancellationToken cancellationToken)
     {
         string rawUrl = url.Replace("https://cloud.nikke-kr.com/", "").Replace("https://global-lobby.nikke-kr.com/", "").TrimStart('/');
         string targetFile = Program.GetCachePathForPath(rawUrl);
+        if (File.Exists(targetFile) && new FileInfo(targetFile).Length > 0)
+        {
+            return targetFile;
+        }
+
         string? targetDir = Path.GetDirectoryName(targetFile);
         if (targetDir == null)
         {
@@ -20,64 +28,94 @@ public class AssetDownloadUtil
         }
         Directory.CreateDirectory(targetDir);
 
-        Logging.WriteLine("Game is requesting " + targetFile);
-        if (!File.Exists(targetFile))
-        {
-            CloudIp ??= await GetIpAsync("cloud.nikke-kr.com");
+        return await InFlightDownloads.GetOrAdd(targetFile, _ => DownloadInternalAsync(url, rawUrl, targetFile, cancellationToken));
+    }
 
-            Uri requestUri = new("https://" + CloudIp + "/" + rawUrl);
+    private static async Task<string?> DownloadInternalAsync(string url, string rawUrl, string targetFile, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (File.Exists(targetFile) && new FileInfo(targetFile).Length > 0)
+            {
+                return targetFile;
+            }
+
+            Logging.WriteLine("Game is requesting " + targetFile);
+            string ip = await GetCloudIpAsync();
+
+            string tempFile = targetFile + ".tmp." + Guid.NewGuid().ToString("N");
+            Uri requestUri = new("https://" + ip + "/" + rawUrl);
             using HttpRequestMessage request = new(HttpMethod.Get, requestUri);
             request.Headers.TryAddWithoutValidation("host", "cloud.nikke-kr.com");
             using HttpResponseMessage response = await AssetDownloader.SendAsync(request, cancellationToken);
             if (response.StatusCode == HttpStatusCode.OK)
             {
-                if (!File.Exists(targetFile))
+                using (FileStream fss = new(tempFile, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
-                    using FileStream fss = new(targetFile, FileMode.CreateNew);
                     await response.Content.CopyToAsync(fss, cancellationToken);
-
-                    fss.Close();
                 }
+                File.Move(tempFile, targetFile, overwrite: true);
+                return targetFile;
             }
-            else
+
+            bool fallbackSuccess = false;
+            if (response.StatusCode == HttpStatusCode.NotFound && rawUrl.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
             {
-                bool fallbackSuccess = false;
-                if (response.StatusCode == HttpStatusCode.NotFound && rawUrl.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+                string withoutExt = rawUrl[..^4];
+                string[] variations = [$"{withoutExt}_en.mp4", $"{withoutExt}_ja.mp4", $"{withoutExt}_ko.mp4"];
+                foreach (string variation in variations)
                 {
-                    string withoutExt = rawUrl[..^4];
-                    string[] variations = [$"{withoutExt}_en.mp4", $"{withoutExt}_ja.mp4", $"{withoutExt}_ko.mp4"];
-                    foreach (string variation in variations)
+                    Uri candidateUri = new("https://" + ip + "/" + variation);
+                    using HttpRequestMessage candidateRequest = new(HttpMethod.Get, candidateUri);
+                    candidateRequest.Headers.TryAddWithoutValidation("host", "cloud.nikke-kr.com");
+                    using HttpResponseMessage candidateResponse = await AssetDownloader.SendAsync(candidateRequest, cancellationToken);
+                    if (candidateResponse.StatusCode == HttpStatusCode.OK)
                     {
-                        Uri candidateUri = new("https://" + CloudIp + "/" + variation);
-                        using HttpRequestMessage candidateRequest = new(HttpMethod.Get, candidateUri);
-                        candidateRequest.Headers.TryAddWithoutValidation("host", "cloud.nikke-kr.com");
-                        using HttpResponseMessage candidateResponse = await AssetDownloader.SendAsync(candidateRequest, cancellationToken);
-                        if (candidateResponse.StatusCode == HttpStatusCode.OK)
+                        using (FileStream fss = new(tempFile, FileMode.Create, FileAccess.Write, FileShare.None))
                         {
-                            if (!File.Exists(targetFile))
-                            {
-                                using FileStream fss = new(targetFile, FileMode.CreateNew);
-                                await candidateResponse.Content.CopyToAsync(fss, cancellationToken);
-
-                                fss.Close();
-                            }
-
-                            Logging.WriteLine($"Successfully downloaded fallback video candidate {variation} for {url}", LogType.Info);
-                            fallbackSuccess = true;
-                            break;
+                            await candidateResponse.Content.CopyToAsync(fss, cancellationToken);
                         }
+                        File.Move(tempFile, targetFile, overwrite: true);
+                        Logging.WriteLine($"Successfully downloaded fallback video candidate {variation} for {url}", LogType.Info);
+                        fallbackSuccess = true;
+                        return targetFile;
                     }
                 }
-
-                if (!fallbackSuccess)
-                {
-                    Console.WriteLine("Failed to download " + url + " with status code " + response.StatusCode);
-                    return null;
-                }
             }
-        }
 
-        return targetFile;
+            if (File.Exists(tempFile))
+            {
+                try { File.Delete(tempFile); } catch { }
+            }
+
+            if (!fallbackSuccess)
+            {
+                Console.WriteLine("Failed to download " + url + " with status code " + response.StatusCode);
+                return null;
+            }
+
+            return targetFile;
+        }
+        finally
+        {
+            InFlightDownloads.TryRemove(targetFile, out _);
+        }
+    }
+
+    private static async Task<string> GetCloudIpAsync()
+    {
+        if (CloudIp != null) return CloudIp;
+        await DnsLock.WaitAsync();
+        try
+        {
+            if (CloudIp != null) return CloudIp;
+            CloudIp = await GetIpAsync("cloud.nikke-kr.com");
+            return CloudIp;
+        }
+        finally
+        {
+            DnsLock.Release();
+        }
     }
 
     public static async Task HandleReq(HttpContext context, string all)
@@ -100,12 +138,9 @@ public class AssetDownloadUtil
 
     public static async Task<string> GetIpAsync(string query)
     {
-        LookupClient lookup = new();
-        IDnsQueryResponse result = await lookup.QueryAsync(query, QueryType.A);
-
+        IDnsQueryResponse result = await DnsLookup.QueryAsync(query, QueryType.A);
         DnsClient.Protocol.ARecord? record = result.Answers.ARecords().FirstOrDefault();
         IPAddress ip = record?.Address ?? throw new Exception($"Failed to find IP address of {query}, check your internet connection.");
-
         return ip.ToString();
     }
 }

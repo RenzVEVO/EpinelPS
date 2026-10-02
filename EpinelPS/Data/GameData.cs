@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Runtime.InteropServices;
 using EpinelPS.Utils;
 using ICSharpCode.SharpZipLib.Zip;
 using MemoryPack;
@@ -853,7 +855,7 @@ public class GameData
 
     public static void DoTransformation(byte[] key, byte[] salt, Stream inputStream, Stream outputStream)
     {
-        SymmetricAlgorithm aes = Aes.Create();
+        using SymmetricAlgorithm aes = Aes.Create();
         aes.Mode = CipherMode.ECB;
         aes.Padding = PaddingMode.None;
 
@@ -867,38 +869,51 @@ public class GameData
         }
 
         byte[] counter = (byte[])salt.Clone();
-
-        Queue<byte> xorMask = new();
-
         byte[] zeroIv = new byte[blockSize];
-        ICryptoTransform counterEncryptor = aes.CreateEncryptor(key, zeroIv);
+        using ICryptoTransform counterEncryptor = aes.CreateEncryptor(key, zeroIv);
 
-        int b;
-        while ((b = inputStream.ReadByte()) != -1)
+        const int bufferSize = 65536;
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(bufferSize);
+        byte[] keystream = ArrayPool<byte>.Shared.Rent(bufferSize);
+
+        try
         {
-            if (xorMask.Count == 0)
+            int bytesRead;
+            while ((bytesRead = inputStream.Read(buffer, 0, bufferSize)) > 0)
             {
-                byte[] counterModeBlock = new byte[blockSize];
-
-                counterEncryptor.TransformBlock(
-                    counter, 0, counter.Length, counterModeBlock, 0);
-
-                for (int i2 = counter.Length - 1; i2 >= 0; i2--)
+                int fullBlocks = (bytesRead + blockSize - 1) / blockSize;
+                for (int b = 0; b < fullBlocks; b++)
                 {
-                    if (++counter[i2] != 0)
+                    counterEncryptor.TransformBlock(counter, 0, blockSize, keystream, b * blockSize);
+                    for (int i2 = blockSize - 1; i2 >= 0; i2--)
                     {
-                        break;
+                        if (++counter[i2] != 0)
+                        {
+                            break;
+                        }
                     }
                 }
 
-                foreach (byte b2 in counterModeBlock)
+                int ulongCount = bytesRead / 8;
+                Span<ulong> bufWords = MemoryMarshal.Cast<byte, ulong>(buffer.AsSpan(0, ulongCount * 8));
+                ReadOnlySpan<ulong> keyWords = MemoryMarshal.Cast<byte, ulong>(keystream.AsSpan(0, ulongCount * 8));
+                for (int i = 0; i < ulongCount; i++)
                 {
-                    xorMask.Enqueue(b2);
+                    bufWords[i] ^= keyWords[i];
                 }
-            }
 
-            byte mask = xorMask.Dequeue();
-            outputStream.WriteByte((byte)(((byte)b) ^ mask));
+                for (int i = ulongCount * 8; i < bytesRead; i++)
+                {
+                    buffer[i] ^= keystream[i];
+                }
+
+                outputStream.Write(buffer, 0, bytesRead);
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+            ArrayPool<byte>.Shared.Return(keystream);
         }
     }
 
