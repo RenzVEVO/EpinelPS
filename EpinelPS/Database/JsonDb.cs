@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using EpinelPS.Data;
 using EpinelPS.Utils;
 using Newtonsoft.Json;
@@ -17,6 +18,7 @@ internal class JsonDb
     private static int _isDirty = 0;
     private static readonly CancellationTokenSource _cts = new();
     private static readonly Task _backgroundFlusherTask;
+    private static readonly ConcurrentDictionary<ulong, User> _userCache = new();
 
 
     static JsonDb()
@@ -73,6 +75,7 @@ internal class JsonDb
             Save();
             Console.WriteLine("JsonDb: Loaded");
 
+            SyncUserCache();
             AppDomain.CurrentDomain.ProcessExit += (_, _) => FlushImmediate();
             _backgroundFlusherTask = Task.Run(BackgroundFlusherLoop);
         }
@@ -99,6 +102,7 @@ internal class JsonDb
             ValidateDb();
             Console.WriteLine("Database reload complete.");
         }
+            SyncUserCache();
     }
 
     private static void ValidateDb()
@@ -215,9 +219,29 @@ internal class JsonDb
         }
     }
 
+    public static void SyncUserCache()
+    {
+        _userCache.Clear();
+        if (Instance?.Users != null)
+        {
+            foreach (var user in Instance.Users)
+            {
+                _userCache[user.ID] = user;
+            }
+        }
+    }
+
     public static User? GetUser(ulong id)
     {
-        return Instance.Users.Where(x => x.ID == id).FirstOrDefault();
+        if (_userCache.TryGetValue(id, out var user))
+            return user;
+
+        user = Instance.Users.FirstOrDefault(x => x.ID == id);
+        if (user != null)
+        {
+            _userCache[id] = user;
+        }
+        return user;
     }
 
     public static RankData GetRank()
@@ -272,9 +296,13 @@ internal class JsonDb
                 string basePath = AppDomain.CurrentDomain.BaseDirectory;
                 string targetPath = Path.Combine(basePath, "db.json");
                 string tempPath = Path.Combine(basePath, "db.json.tmp");
-
-                string json = JsonConvert.SerializeObject(Instance, Formatting.Indented);
-                File.WriteAllText(tempPath, json);
+                using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536))
+                using (var sw = new StreamWriter(fs, System.Text.Encoding.UTF8))
+                using (var jw = new JsonTextWriter(sw) { Formatting = Formatting.Indented })
+                {
+                    var serializer = new JsonSerializer();
+                    serializer.Serialize(jw, Instance);
+                }
                 File.Move(tempPath, targetPath, overwrite: true);
             }
             catch (Exception ex)
@@ -285,29 +313,12 @@ internal class JsonDb
     }
     public static int CurrentJukeboxBgm(int position)
     {
-        var activeJukeboxBgm = new List<int>();
-        //important first position holds lobby bgm id and second commanders room bgm id
-        foreach (var user in Instance.Users)
+        var firstUser = Instance?.Users?.FirstOrDefault();
+        if (firstUser?.JukeboxBgm != null && firstUser.JukeboxBgm.Count >= position && position > 0)
         {
-            if (user.JukeboxBgm == null || user.JukeboxBgm.Count == 0)
-            {
-                // this if statemet only exists becaus some weird black magic copies default value over and over
-                //in the file when its set in public List<int> JukeboxBgm = new List<int>(); 
-                //delete when or if it gets fixed
-
-                user.JukeboxBgm = [2, 5];
-            }
-
-            activeJukeboxBgm.AddRange(user.JukeboxBgm);
+            return firstUser.JukeboxBgm[position - 1];
         }
-
-        if (activeJukeboxBgm.Count == 0)
-        {
-            return 8995001;
-        }
-
-        position = (position == 2 && activeJukeboxBgm.Count > 1) ? 2 : 1;
-        return activeJukeboxBgm[position - 1];
+        return position == 2 ? 5 : 2;
     }
 
     public static bool IsSickPulls(User selectedUser)

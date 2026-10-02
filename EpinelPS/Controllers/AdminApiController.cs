@@ -23,7 +23,6 @@ public class AdminApiController(GameContext DbContext) : ControllerBase
     private static readonly AsyncLocal<string?> RequestLanguage = new();
     private readonly GameContext dbContext = DbContext;
     private readonly CommandRegistry registry = new();
-    private static readonly MD5 md5 = MD5.Create();
 
     [HttpPost]
     [Route("login")]
@@ -33,17 +32,8 @@ public class AdminApiController(GameContext DbContext) : ControllerBase
         bool nullusernames = false;
         if (b.Username != null && b.Password != null)
         {
-            string passwordHash = Convert.ToHexString(md5.ComputeHash(Encoding.ASCII.GetBytes(b.Password))).ToLower();
-            foreach (var item in dbContext.SdkUsers)
-            {
-                if (item.Email == b.Username && item.PasswordHash != null)
-                {
-                    if (item.PasswordHash.Equals(passwordHash, StringComparison.OrdinalIgnoreCase))
-                    {
-                        user = item;
-                    }
-                }
-            }
+            string passwordHash = Convert.ToHexString(MD5.HashData(Encoding.ASCII.GetBytes(b.Password))).ToLowerInvariant();
+            user = dbContext.SdkUsers.FirstOrDefault(item => item.Email == b.Username && item.PasswordHash != null && item.PasswordHash.ToLower() == passwordHash);
         }
         else
         {
@@ -99,16 +89,18 @@ public class AdminApiController(GameContext DbContext) : ControllerBase
 
         bool admin = JsonDb.Instance.Users.Count == 0;
 
-        JsonDb.Instance.Users.Add(new User()
+        var newUser = new User()
         {
             ID = uid
-        });
+        };
+        JsonDb.Instance.Users.Add(newUser);
+        JsonDb.SyncUserCache();
 
         dbContext.SdkUsers.Add(new SdkUser()
         {
             ID = uid,
             Email = req.Email,
-            PasswordHash = Convert.ToHexString(md5.ComputeHash(Encoding.ASCII.GetBytes(req.Password))).ToLower(),
+            PasswordHash = Convert.ToHexString(MD5.HashData(Encoding.ASCII.GetBytes(req.Password))).ToLowerInvariant(),
             RegisterTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             IsAdmin = admin,
             PlayerName = "Player_" + Rng.RandomString(8),
@@ -121,7 +113,6 @@ public class AdminApiController(GameContext DbContext) : ControllerBase
 
         JsonDb.Save();
         dbContext.SaveChanges();
-
         return new RunCmdResponse() { ok = true };
     }
 

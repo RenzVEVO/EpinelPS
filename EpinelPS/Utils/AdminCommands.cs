@@ -63,16 +63,14 @@ public class AdminCommands
     }
     public static RunCmdResponse CompleteAllStages(ulong userId)
     {
-        // Find max chapter number
-        var chapters = GameData.Instance.ChapterCampaignData.Values;
-        int maxChapter = chapters.Max(c => c.Chapter);
+        // Find max chapter number that actually has valid normal main stages
+        var validChapters = GameData.Instance.ChapterCampaignData.Values
+            .Where(c => GetNormalMainStages(c.Chapter).Count > 0)
+            .ToList();
 
-        // Find max stage count for that chapter (main stages)
-        // GetStageIdsForChapter uses a zero-based chapter index, while the
-        // campaign table and admin command use the user-facing one-based
-        // chapter number.
+        int maxChapter = validChapters.Count > 0 ? validChapters.Max(c => c.Chapter) : 32;
+
         int maxStage = GetNormalMainStages(maxChapter).Count;
-
         if (maxStage == 0) maxStage = 1;
 
         return CompleteStage(userId, $"{maxChapter}-{maxStage}");

@@ -309,27 +309,43 @@ public class User
         }
     }
 
+    [Newtonsoft.Json.JsonIgnore]
+    private int _maxIsn = -1;
+    [Newtonsoft.Json.JsonIgnore]
+    private int _maxCsn = -1;
+
     public int GenerateUniqueItemId()
     {
-        var num = Rng.RandomId();
-
-        while (Items.Any(x => x.Isn == num))
+        if (_maxIsn < 0)
         {
-            num = Rng.RandomId();
+            int currentMax = 0;
+            if (Items != null && Items.Count > 0)
+            {
+                foreach (var item in Items)
+                {
+                    if (item.Isn > currentMax && item.Isn <= int.MaxValue) currentMax = (int)item.Isn;
+                }
+            }
+            _maxIsn = Math.Max(currentMax, 1000);
         }
-
-        return num;
+        return Interlocked.Increment(ref _maxIsn);
     }
+
     public int GenerateUniqueCharacterId()
     {
-        var num = Rng.RandomId();
-
-        while (Characters.Any(x => x.Csn == num))
+        if (_maxCsn < 0)
         {
-            num = Rng.RandomId();
+            int currentMax = 0;
+            if (Characters != null && Characters.Count > 0)
+            {
+                foreach (var character in Characters)
+                {
+                    if (character.Csn > currentMax) currentMax = character.Csn;
+                }
+            }
+            _maxCsn = Math.Max(currentMax, 1000);
         }
-
-        return num;
+        return Interlocked.Increment(ref _maxCsn);
     }
     public bool IsStageCompleted(int Id)
     {
