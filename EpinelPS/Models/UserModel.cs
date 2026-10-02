@@ -44,6 +44,9 @@ public class User
 
     // Game data
     public List<string> CompletedScenarios { get; set; } = [];
+    public List<string> BookmarkedScenarios { get; set; } = [];
+    public List<string> SideStoryBookmarks { get; set; } = [];
+    public List<string> SubQuestBookmarks { get; set; } = [];
     public Dictionary<string, FieldInfo> FieldInfo { get; set; } = []; // here for backwards compatibility
 
     public Dictionary<string, FieldInfoNew> FieldInfoNew { get; set; } = [];

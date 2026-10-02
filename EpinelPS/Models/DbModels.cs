@@ -80,6 +80,7 @@ public class EquipmentAwakeningData
 public class EventData
 {
     public List<string> CompletedScenarios { get; set; } = [];
+    public List<string> BookmarkedScenarios { get; set; } = [];
     public List<int> ClearedStages { get; set; } = []; // List of cleared stage IDs
     public int Diff { get; set; } = 0; // Default value for Diff
     public int LastStage { get; set; } = 0; // Default value for LastStage
@@ -586,6 +587,7 @@ public class MiniGameScenarios
 {
     public int ArcadeId { get; set; }
     public List<string> CompletedScenarios { get; set; } = [];
+    public List<string> BookmarkedScenarios { get; set; } = [];
 
 }
 
