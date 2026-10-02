@@ -724,6 +724,7 @@ public class User
             DispatchResetCount = 0;
             ResetableData.DispatchCount = GetDispatchCount() + (infracore != null ? infracore.FunctionList[1].Function : 0);
             ResetableData.DailyCounselCount[1] = 3 + (infracore != null ? infracore.FunctionList[2].Function : 0);
+            ResetableData.InterceptionTickets = JsonDb.Instance?.MaxInterceptionCount ?? 3;
             GachaDailyFreePulls.Clear();
             DailyDiscountUsed = false;
 
