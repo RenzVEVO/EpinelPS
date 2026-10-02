@@ -37,6 +37,11 @@ public static class InterceptionHelper
         }
         else
         {
+            if (id == 0)
+            {
+                id = LobbyServer.Intercept.GetInterceptData.GetCurrentSpecialInterceptionId();
+            }
+
             if (GameData.Instance.InterceptSpecial.TryGetValue(id, out var specRecord))
             {
                 conditionReward = specRecord.ConditionRewardGroup;
@@ -137,6 +142,11 @@ public static class InterceptionHelper
         }
         else
         {
+            if (id == 0)
+            {
+                id = LobbyServer.Intercept.GetInterceptData.GetCurrentSpecialInterceptionId();
+            }
+
             if (GameData.Instance.InterceptSpecial.TryGetValue(id, out var spec))
                 conditionRewardGroup = spec.ConditionRewardGroup;
             else if (GameData.Instance.InterceptSpecial.Count > 0)
