@@ -98,9 +98,9 @@ public class NetUtils
 
     public static List<NetUserItemData> GetUserItems(User user)
     {
+        RewardUtils.SanitizeEquipmentItems(user);
         List<NetUserItemData> ret = [];
         Dictionary<int, NetUserItemData> stackableDictionary = [];
-
         foreach (DbItemData? item in user.Items.ToList())
         {
             if (item == null) continue;

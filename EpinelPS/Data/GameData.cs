@@ -317,6 +317,12 @@ public class GameData
     [LoadRecord("InterceptSpecialTable.json", "Id")]
     public readonly Dictionary<int, InterceptSpecialRecord> InterceptSpecial = [];
 
+    [LoadRecord("InterceptAnomalousTable.json", "Id")]
+    public readonly Dictionary<int, InterceptAnomalousRecord_Raw> InterceptAnomalous = [];
+
+    [LoadRecord("InterceptAnomalousManagerTable.json", "Id")]
+    public readonly Dictionary<int, InterceptAnomalousManagerRecord_Raw> InterceptAnomalousManager = [];
+
     [LoadRecord("ConditionRewardTable.json", "Id")]
     public readonly Dictionary<int, ConditionRewardRecord> ConditionRewards = [];
     [LoadRecord("ItemConsumeTable.json", "Id")]
@@ -1116,14 +1122,25 @@ public class GameData
         {
             return equipRecord.ItemSubType;
         }
-
         // Check if it's a harmony cube item
         if (ItemHarmonyCubeTable.TryGetValue(itemType, out ItemHarmonyCubeRecord? harmonyCubeRecord))
         {
             return harmonyCubeRecord.ItemSubType;
         }
 
-        // Return null if item type not found
+        // Check if it's a material item (e.g. Custom Module)
+        if (itemMaterialTable.TryGetValue(itemType, out ItemMaterialRecord? materialRecord))
+        {
+            return materialRecord.ItemSubType;
+        }
+
+        // Check if it's a consumable item
+        if (ConsumableItems.TryGetValue(itemType, out ItemConsumeRecord? consumeRecord))
+        {
+            return consumeRecord.ItemSubType;
+        }
+
+        // Return none if item type not found
         return ItemSubType.None;
     }
 
