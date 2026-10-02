@@ -1,4 +1,5 @@
 using EpinelPS.Data;
+using EpinelPS.Utils;
 namespace EpinelPS.LobbyServer.Inventory;
 
 [GameRequest("/inventory/get")]
@@ -8,6 +9,7 @@ public class GetInventoryData : LobbyMessage
     {
         ReqGetInventoryData req = await ReadData<ReqGetInventoryData>();
         User user = GetUser();
+        RewardUtils.SanitizeEquipmentItems(user);
 
         ResGetInventoryData response = new();
         foreach (DbItemData item in user.Items)

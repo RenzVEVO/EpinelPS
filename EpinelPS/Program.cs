@@ -51,7 +51,7 @@ internal class Program
             {
                 // Purge any cursed/broken characters (like Belorta Alt) or clone duplicates from past shenanigans
                 AdminCommands.SanitizeUserCharacters(user);
-
+                RewardUtils.SanitizeEquipmentItems(user);
                 if (user.LastNormalStageCleared >= 6000002)
                 {
                     ClearStage.EnsureDefaultCharacters(user);
@@ -292,5 +292,4 @@ internal class Program
     {
         return AppDomain.CurrentDomain.BaseDirectory + "cache/" + path;
     }
-
 }

@@ -280,12 +280,13 @@ public class ResetableData
     public Dictionary<CorporationTowerType, int> TowerCount { get; set; } = System.Enum.GetValues<CorporationTowerType>().ToDictionary(t => t, _ => 0);
     public Dictionary<int, int> DailyCounselCount { get; set; } = [];
     public int DispatchCount { get; set; } = 0;
-
+    public Dictionary<int, long> InterceptDailyClearData { get; set; } = [];
 }
 public class WeeklyResetableData
 {
     public List<int> CompletedWeeklyMissions { get; set; } = [];
     public int WeeklyMissionPoints { get; set; }
+    public Dictionary<int, long> InterceptAnomalousClearData { get; set; } = [];
 }
 public class OutpostBuffs
 {
