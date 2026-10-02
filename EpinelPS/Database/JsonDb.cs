@@ -120,6 +120,20 @@ internal class JsonDb
                     .ToDictionary(t => t, _ => 0);
             }
 
+            // Reset interception attempts on server boot
+            user.ResetableData.InterceptionTickets = Instance.MaxInterceptionCount;
+
+            // Reset solo raid attempts on server boot
+            if (user.SoloRaidData != null)
+            {
+                foreach (var raid in user.SoloRaidData.Values)
+                {
+                    raid.RaidOpenCount = 0;
+                    raid.TrialCount = 0;
+                    raid.SoloRaidLevels.RemoveAll(l => l.IsOpen);
+                }
+            }
+
             // check if character level is valid
             foreach (var c in user.Characters)
             {
