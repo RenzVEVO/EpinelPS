@@ -178,7 +178,7 @@ public static class ArchiveEventQuestHelper
             int managerId = targetQuest.EventQuestManagerId;
             var expectedCurrent = GetCurrentActiveQuest(user, managerId);
 
-            // Strictly require sequential completion: only clear if questId is the current expected quest
+            // 1. Direct sequential clear: questId is expected current quest
             if (expectedCurrent != null && questId == expectedCurrent.Id)
             {
                 if (!user.ClearedArchiveEventQuestIds.Contains(questId))
@@ -207,6 +207,41 @@ public static class ArchiveEventQuestHelper
                     }
                     changed = true;
                 }
+            }
+            // 2. Intro paired clear: client claims Quest 2 to clear tied intro (Quest 1 + Quest 2)
+            else if (expectedCurrent != null && questId == expectedCurrent.NextQuestId)
+            {
+                if (!user.ClearedArchiveEventQuestIds.Contains(expectedCurrent.Id))
+                {
+                    user.ClearedArchiveEventQuestIds.Add(expectedCurrent.Id);
+                }
+                if (!user.ClearedArchiveEventQuestIds.Contains(questId))
+                {
+                    user.ClearedArchiveEventQuestIds.Add(questId);
+                }
+                changed = true;
+
+                var nextQuest = targetQuest.NextQuestId != 0
+                    ? GameData.Instance.archiveEventQuestRecords.GetValueOrDefault(targetQuest.NextQuestId)
+                    : null;
+
+                if (nextQuest == null || nextQuest.ConditionType == Category.End)
+                {
+                    if (nextQuest != null && !user.ClearedArchiveEventQuestIds.Contains(nextQuest.Id))
+                    {
+                        user.ClearedArchiveEventQuestIds.Add(nextQuest.Id);
+                    }
+
+                    if (user.ActivatedArchiveEventQuestId != 0 &&
+                        ResolveManagerId(user.ActivatedArchiveEventQuestId) == managerId)
+                    {
+                        user.ActivatedArchiveEventQuestId = 0;
+                    }
+                }
+            }
+            else if (expectedCurrent != null && questId != expectedCurrent.Id)
+            {
+                Logging.WriteLine($"[ArchiveQuest] Rejecting out-of-order claim for quest {questId}; active quest is {expectedCurrent.Id}", LogType.Warning);
             }
         }
         if (changed)
