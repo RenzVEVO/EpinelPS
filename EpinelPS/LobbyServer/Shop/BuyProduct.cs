@@ -83,10 +83,49 @@ public class BuyProduct : LobbyMessage
         }
         else if (product.GoodsType == RewardType.Character)
         {
-            var reward = new NetRewardData();
-            RewardUtils.AddSingleObject(user, ref reward, product.GoodsId, RewardType.Character, quantity);
-            response.Product.Character.Add(reward.Character);
-            response.Product.UserCharacters.AddRange(reward.UserCharacters);
+            try
+            {
+                var reward = new NetRewardData();
+                RewardUtils.AddSingleObject(user, ref reward, product.GoodsId, RewardType.Character, quantity);
+                response.Product.Character.Add(reward.Character);
+                response.Product.UserCharacters.AddRange(reward.UserCharacters);
+
+                // For Spare bodies
+                if (reward.UserItems.Count > 0)
+                {
+                    var firstSpare = reward.Item.FirstOrDefault();
+                    if (firstSpare != null)
+                    {
+                        response.Item = new NetUserItemData
+                        {
+                            Isn = firstSpare.Isn,
+                            Tid = firstSpare.Tid,
+                            Count = firstSpare.Count,
+                            Corporation = firstSpare.Corporation
+                        };
+                    }
+                    response.Product.Item.AddRange(reward.Item);
+                    response.Product.UserItems.AddRange(reward.UserItems);
+                    response.Result = ShopBuyProductResult.Success;
+                }
+
+                // In case user gets body labels
+                if (reward.Currency.Count > 0)
+                {
+                    foreach (var currency in reward.Currency)
+                    {
+                        response.Currencies.Add(new NetUserCurrencyData
+                        {
+                            Type = currency.Type,
+                            Value = user.GetCurrencyVal((CurrencyType)currency.Type),
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.WriteLine($"Buy Unit Exception: {ex.Message}", LogType.Error);
+            }
         }
         else if (product.GoodsType == RewardType.LiveWallpaper)
         {

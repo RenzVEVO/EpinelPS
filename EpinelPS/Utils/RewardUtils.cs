@@ -482,17 +482,8 @@ public class RewardUtils
                     });
 
 
-                    //ret.UserItems.Add(NetUtils.UserItemDataToNet(spareItem));
-                    //ret.Character.Add(GetNetCharacterData(ownedCharacter));
-
-                    // Tell the client the new amount of this item
-                    ret.UserItems.Add(new NetUserItemData()
-                    {
-                        Isn = spareItem.Isn,
-                        Tid = spareItem.ItemType,
-                        Count = spareItem.Count,
-                        Corporation = spareItem.Corp
-                    });
+                    ret.UserItems.Add(NetUtils.UserItemDataToNet(spareItem));
+                    ret.Character.Add(GetNetCharacterData(ownedCharacter));
                 }
                 else
                 {
